@@ -22,9 +22,16 @@ const sans = Inter({
   display: "swap"
 });
 
+// Trimmed from 5 weights × 2 styles (10 combinations) → 2 × 2 (4). Grep of
+// the codebase shows `--font-serif-display` is only used with `font-light`
+// (300) and `font-normal` (400), both normal and italic — the 500/600/700
+// weights were loaded but never referenced. Fewer variants = fewer chances
+// for `next/font` to choke on a flaky Google Fonts response during Vercel
+// builds (which was crashing the deploy with
+// `TypeError: Cannot read properties of null (reading '1')`).
 const serifDisplay = Noto_Serif_Display({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["300", "400"],
   style: ["normal", "italic"],
   variable: "--font-serif-display",
   display: "swap"
