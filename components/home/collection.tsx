@@ -24,12 +24,19 @@ const FEATURED = FEATURED_HANDLES
   .map((handle) => PRODUCTS.find((p) => p.handle === handle))
   .filter((p): p is Product => Boolean(p));
 
-// Per-category image override for the home tiles. Falls back to the product's
-// own image if the override key is absent. Drop matching files into
-// public/images/home-tiles/ and they'll appear automatically.
-const TILE_IMAGE_OVERRIDE: Partial<Record<Product["category"], string>> = {};
+// Hardcoded tile-image default map — DISABLED. Backend-only now. Admin
+// authors overrides via Banners (type: 'weave') and the home page passes
+// them in as `tileOverrides`. If no override is authored, the tile falls
+// through to the product's own image. Uncomment to restore a hardcoded
+// per-category tile.
+//
+// const DEFAULT_TILE_IMAGE_OVERRIDE: Partial<Record<Product["category"], string>> = {};
 
-export function Collection() {
+export function Collection({
+  tileOverrides
+}: {
+  tileOverrides?: Record<string, string>;
+} = {}) {
   const isDesktop = useIsDesktop();
   const gridRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
@@ -79,6 +86,7 @@ export function Collection() {
               index={i}
               scrollYProgress={scrollYProgress}
               isDesktop={isDesktop}
+              tileOverrides={tileOverrides}
             />
           ))}
         </div>
@@ -109,12 +117,14 @@ function ProductTile({
   product,
   index,
   scrollYProgress,
-  isDesktop
+  isDesktop,
+  tileOverrides
 }: {
   product: Product;
   index: number;
   scrollYProgress: MotionValue<number>;
   isDesktop: boolean;
+  tileOverrides?: Record<string, string>;
 }) {
   // grid position on the 3-col desktop layout
   const col = index % 3; // 0 = left, 1 = center, 2 = right
@@ -136,8 +146,13 @@ function ProductTile({
 
   // Home tiles are framed as one representative per category, so the tile
   // heading shows the category name rather than the specific product name.
+  // Admin-authored weave banners override the tile image per category name;
+  // we check the backend overrides first, then the hardcoded default map,
+  // then fall back to the product's own image.
   const tileHeading = product.category;
-  const tileImage = TILE_IMAGE_OVERRIDE[product.category] ?? product.image;
+  // Lookup: backend weave override → product's own image. The hardcoded
+  // DEFAULT_TILE_IMAGE_OVERRIDE middle tier is DISABLED above.
+  const tileImage = tileOverrides?.[product.category] ?? product.image;
 
   return (
     <motion.article

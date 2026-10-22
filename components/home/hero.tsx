@@ -5,20 +5,30 @@ import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion"
 // useEffect kept commented alongside the disabled slider interval below.
 import { useRef, useState } from "react";
 
-const SLIDES = [
-  {
-    src: "/images/home-hero2.png",
-    alt: "The Luxe Version — interior in deep black velvet"
-  },
-  {
-    src: "/images/hero-banner-v2.png",
-    alt: "The Luxe Version — sculptural pieces in warm neutrals"
-  }
-];
+// Hardcoded defaults — DISABLED. Previously used when no backend hero
+// banner was authored for the home page. Uncomment to restore the two-
+// slide default and the hardcoded "Discover the new collection" CTA.
+//
+// const DEFAULT_SLIDES = [
+//   { src: "/images/home-hero2.png", alt: "The Luxe Version — interior in deep black velvet" },
+//   { src: "/images/hero-banner-v2.png", alt: "The Luxe Version — sculptural pieces in warm neutrals" }
+// ];
+// const DEFAULT_CTA_LABEL = "Discover the new collection";
+// const DEFAULT_CTA_HREF = "#collection";
 
 // const SLIDE_DURATION_MS = 4000; // slider disabled
 
-export function Hero() {
+// Props mirror the fields on a backend `type: 'hero'` banner. All optional —
+// when a page doesn't fetch a hero (or the admin hasn't authored one) the
+// component renders the hardcoded defaults above.
+export type HeroProps = {
+  image?: string;
+  imageAlt?: string;
+  ctaLabel?: string;
+  ctaHref?: string;
+};
+
+export function Hero({ image, imageAlt, ctaLabel, ctaHref }: HeroProps = {}) {
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
@@ -30,6 +40,13 @@ export function Hero() {
   const opacity = useTransform(scrollYProgress, [0, 0.7], [1, 0]);
 
   const [active] = useState(0);
+
+  // Backend-only. If no banner authored, slides is a single empty-src entry
+  // and the Next <Image> below will error — intentional, so missing banners
+  // are visible during integration rather than silently papered over.
+  const slides = [{ src: image || "", alt: imageAlt || "" }];
+  const resolvedCtaLabel = ctaLabel || "";
+  const resolvedCtaHref = ctaHref || "";
 
   // Slider auto-rotation disabled for now — first slide only.
   // useEffect(() => {
@@ -58,8 +75,8 @@ export function Hero() {
             className="absolute inset-0"
           >
             <Image
-              src={SLIDES[active].src}
-              alt={SLIDES[active].alt}
+              src={slides[active].src}
+              alt={slides[active].alt}
               fill
               priority={active === 0}
               sizes="100vw"
@@ -76,8 +93,8 @@ export function Hero() {
         style={{ opacity }}
         className="absolute inset-x-0 bottom-10 z-10 flex justify-center md:bottom-14"
       >
-        <a href="#collection" className="cta-rule text-chalk">
-          Discover the new collection
+        <a href={resolvedCtaHref} className="cta-rule text-chalk">
+          {resolvedCtaLabel}
         </a>
       </motion.div>
 

@@ -25,11 +25,14 @@ export type ProductInspiration = {
 export type Product = {
   handle: string;
   name: string;
-  category:
-    | "Sculptures"
-    | "Vases"
-    | "Tabletop"
-    | "Lighting";
+  // Category slug (matches a Category._id on the backend). Previously a
+  // strict union of hardcoded labels; now any slug the backend returns is
+  // valid so admin-authored categories flow through without a code change.
+  category: string;
+  // Edit tag slug (matches an EditTag._id on the backend). Used by the
+  // /edit page to group products under each tag. Optional — not every
+  // product belongs to an edit.
+  editTag?: string;
   description: string;
   price: { inr: number; usd: number };
   image: string;
@@ -45,9 +48,11 @@ export type Product = {
   inspiration?: ProductInspiration;
 };
 
-// URL slug for a product's category page. Kept in sync with the CATEGORIES
-// keys in app/collections/[category]/page.tsx.
-export function categorySlug(category: Product["category"]): string {
+// URL slug for a product's category page. Accepts either a slug (already
+// lowercase and hyphenated — just returns it) or a display label (title-case
+// → slug). The backend now stores Product.category as a slug; hardcoded
+// storefront data still uses display labels and both go through here.
+export function categorySlug(category: string): string {
   return category.toLowerCase().replace(/\s+/g, "-");
 }
 

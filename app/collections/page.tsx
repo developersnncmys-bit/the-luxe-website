@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
-import { type Product } from "@/lib/content";
 import { fetchProducts } from "@/lib/products-api";
+import { fetchCategories } from "@/lib/categories-api";
+import { fetchHeroFor } from "@/lib/banners-api";
 import { CollectionHero } from "@/components/collections/collection-hero";
+// Hardcoded editorial / cta chapters — DISABLED. Backend-only now via
+// <BannerSections page="collection" />. Uncomment the import AND the
+// JSX below together to restore any chapter.
+//
 import { CollectionManifesto } from "@/components/collections/collection-manifesto";
 import { CollectionInterlude } from "@/components/collections/collection-interlude";
-import { CategorySection } from "@/components/collections/category-section";
 import { CollectionClosing } from "@/components/collections/collection-closing";
+import { CategorySection } from "@/components/collections/category-section";
+import { BannerSections } from "@/components/site/banner-sections";
 
 export const metadata: Metadata = {
   title: "The Collection — The Luxe Version",
@@ -13,55 +19,36 @@ export const metadata: Metadata = {
     "Objects and lighting — the pieces you keep."
 };
 
-// Taxonomy mirrors the navbar sublinks. Empty categories are filtered out at
-// render time so the page never shows a hollow section, and re-populate
-// automatically once matching products land in `content.ts`.
-const CATEGORY_CONFIG: Array<{
-  id: string;
-  label: Product["category"];
-  intro: string;
-}> = [
-  {
-    id: "sculptures",
-    label: "Sculptures",
-    intro:
-      "Hand-carved and cast forms — the piece a room turns toward first."
-  },
-  {
-    id: "vases",
-    label: "Vases",
-    intro:
-      "Vessels in ceramic, stone and glass — sculpture that holds."
-  },
-  {
-    id: "tabletop",
-    label: "Tabletop",
-    intro:
-      "Vessels and forms scaled for the dining table — service as composition."
-  },
-  {
-    id: "lighting",
-    label: "Lighting",
-    intro:
-      "Chandeliers, pendants and lamps — light that draws a room together."
-  }
-];
-
 export default async function CollectionsPage() {
-  const products = await fetchProducts();
-  const active = CATEGORY_CONFIG
+  // Categories come from the backend (sorted by order, active-only); the
+  // product grid is capped at 3 per category — the overview is a taste, the
+  // dedicated /collections/{slug} page shows every piece. Hero banner is
+  // optional; CollectionHero falls back to its hardcoded defaults.
+  const [categories, products, hero] = await Promise.all([
+    fetchCategories(),
+    fetchProducts(),
+    fetchHeroFor("collection")
+  ]);
+
+  const active = categories
     .map((c) => ({
-      ...c,
-      // Cap at 3 per category — the collections overview is a taste of each
-      // category, not the full grid; the dedicated /collections/{slug} page
-      // shows every piece.
-      products: products.filter((p) => p.category === c.label).slice(0, 3)
+      id: c.id,
+      label: c.name,
+      intro: c.tagline || c.collectionNote || "",
+      products: products
+        .filter((p) => p.category.toLowerCase() === c.id.toLowerCase())
+        .slice(0, 3)
     }))
     .filter((c) => c.products.length > 0);
 
   return (
     <>
-      <CollectionHero />
+      <CollectionHero
+        image={hero?.image || undefined}
+        imageAlt={hero?.title || hero?.subtitle || undefined}
+        ctaLabel={hero?.ctaLabel || undefined}
+        ctaHref={hero?.ctaHref || undefined}
+      />
       <CollectionManifesto />
       <CollectionInterlude />
       {active.map((c, i) => (
@@ -77,6 +64,7 @@ export default async function CollectionsPage() {
         />
       ))}
       <CollectionClosing />
+      <BannerSections page="collection" />
     </>
   );
 }

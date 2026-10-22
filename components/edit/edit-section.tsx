@@ -13,6 +13,12 @@ type Props = {
   intro: string;
   products: Product[];
   mirror?: boolean;
+  // Backend-authored overrides (all optional). When undefined, the section
+  // keeps its historical hardcoded-feel behaviour.
+  piecesCount?: number;      // explicit count — overrides products.length
+  description?: string;       // longer editorial paragraph below the intro
+  featureImage?: string;      // hero image shown above the product stack
+  featuredPieceName?: string; // caption under the hero image
 };
 
 export function EditSection({
@@ -21,8 +27,18 @@ export function EditSection({
   title,
   intro,
   products,
-  mirror = false
+  mirror = false,
+  piecesCount,
+  description,
+  featureImage,
+  featuredPieceName
 }: Props) {
+  // Admin override wins; falls back to the matched-product count.
+  const resolvedCount =
+    typeof piecesCount === "number" && piecesCount > 0
+      ? piecesCount
+      : products.length;
+
   return (
     <section
       id={id}
@@ -61,6 +77,18 @@ export function EditSection({
               {intro}
             </motion.p>
 
+            {description && (
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-15% 0px" }}
+                transition={{ duration: 1.2, delay: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                className="mt-6 max-w-sm text-[13px] leading-[1.8] text-chalk/70"
+              >
+                {description}
+              </motion.p>
+            )}
+
             <motion.div
               initial={{ opacity: 0, y: 14 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -72,19 +100,48 @@ export function EditSection({
                 aria-hidden
                 className="text-[10px] uppercase tracking-[0.32em] text-chalk/40"
               >
-                {String(products.length).padStart(2, "0")} pieces in this edit
+                {String(resolvedCount).padStart(2, "0")} pieces in this edit
               </span>
             </motion.div>
           </div>
 
           {/* Product stack — narrower column with capped image width for strong
-              negative space around each piece. */}
+              negative space around each piece. Optional admin-authored feature
+              lead card sits above the first piece. */}
           <div
             className={clsx(
               "flex flex-col gap-20 md:col-span-5 md:gap-32",
               mirror ? "md:col-start-1 md:row-start-1" : "md:col-start-8"
             )}
           >
+            {(featureImage || featuredPieceName) && (
+              <motion.figure
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-10% 0px" }}
+                transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
+                className="mx-auto w-full max-w-md"
+              >
+                {featureImage && (
+                  <div className="relative aspect-[4/5] w-full overflow-hidden bg-onyx">
+                    <SafeImage
+                      src={featureImage}
+                      alt={featuredPieceName || title}
+                      fallbackSeed={`edit-feature-${id}`}
+                      fill
+                      sizes="(min-width: 768px) 50vw, 100vw"
+                      className="object-cover"
+                    />
+                  </div>
+                )}
+                {featuredPieceName && (
+                  <figcaption className="mt-6 text-[11px] uppercase tracking-[0.26em] text-chalk/70">
+                    {featuredPieceName}
+                  </figcaption>
+                )}
+              </motion.figure>
+            )}
+
             {products.map((p) => (
               <EditCard key={p.handle} product={p} />
             ))}

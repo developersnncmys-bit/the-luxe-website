@@ -6,10 +6,12 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode
 } from "react";
 import { PRODUCTS, type Product } from "@/lib/content";
+import { apiFetch, clearToken, getToken, setToken } from "@/lib/api";
 
 export type DrawerKind = "cart" | "wishlist" | "search" | "account" | null;
 
@@ -96,7 +98,7 @@ export type Order = {
   gst: number;
 };
 
-// What the caller passes to addOrder. The store fills in id/placedAt/status.
+// What the caller passes to placeOrder. The store fills in id/placedAt/status.
 export type OrderDraft = Omit<Order, "id" | "placedAt" | "status">;
 
 type StoreState = {
@@ -122,7 +124,8 @@ type StoreState = {
   isInWishlist: (handle: string) => boolean;
   removeFromWishlist: (handle: string) => void;
 
-  signIn: (email: string, name?: string) => void;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, name?: string) => Promise<void>;
   signOut: () => void;
 
   addAddress: (address: Omit<Address, "id">) => void;
@@ -130,7 +133,7 @@ type StoreState = {
 
   updatePreferences: (patch: Partial<Preferences>) => void;
 
-  placeOrder: (draft: OrderDraft) => Order;
+  placeOrder: (draft: OrderDraft) => Promise<Order>;
   cancelOrder: (id: string) => void;
   orderById: (id: string) => Order | undefined;
 
@@ -160,6 +163,103 @@ function safeParse<T>(raw: string | null, fallback: T): T {
   }
 }
 
+// ---------- Backend payload shapes ----------
+
+type BackendAddress = {
+  _id?: string;
+  id?: string;
+  name?: string;
+  line1: string;
+  line2?: string;
+  city: string;
+  state: string;
+  postal: string;
+  country: string;
+  phone?: string;
+};
+
+type BackendUser = {
+  id: string;
+  email: string;
+  name?: string;
+  addresses?: BackendAddress[];
+  wishlist?: string[];
+  preferences?: Preferences;
+};
+
+type BackendOrder = {
+  id: string;
+  ref: string;
+  status: "placed" | "processing" | "shipped" | "delivered" | "cancelled";
+  cancelledAt?: string;
+  items: Array<{
+    handle: string;
+    name: string;
+    image?: string;
+    qty: number;
+    unitPrice: number;
+    lineTotal: number;
+  }>;
+  extras?: CartExtras;
+  delivery?: { method?: "standard" | "express"; cost?: number };
+  payment?: { method?: Order["payment"]["method"]; fee?: number };
+  contact?: Order["contact"];
+  shipping?: Order["shipping"];
+  subtotal: number;
+  total: number;
+  gst: number;
+  createdAt: string;
+};
+
+const toLocalAddress = (a: BackendAddress): Address => ({
+  id: (a._id || a.id || "") as string,
+  name: a.name || "",
+  line1: a.line1,
+  line2: a.line2,
+  city: a.city,
+  state: a.state,
+  postal: a.postal,
+  country: a.country,
+  phone: a.phone
+});
+
+const toLocalOrder = (o: BackendOrder): Order => ({
+  id: o.ref || o.id,
+  placedAt: o.createdAt,
+  status:
+    o.status === "cancelled"
+      ? "cancelled"
+      : o.status === "shipped"
+      ? "shipped"
+      : o.status === "delivered"
+      ? "delivered"
+      : "placed",
+  cancelledAt: o.cancelledAt,
+  items: o.items.map((i) => ({
+    handle: i.handle,
+    name: i.name,
+    image: i.image,
+    qty: i.qty,
+    unitPrice: i.unitPrice,
+    lineTotal: i.lineTotal
+  })),
+  extras: o.extras ?? DEFAULT_EXTRAS,
+  delivery: {
+    method: o.delivery?.method ?? "standard",
+    cost: o.delivery?.cost ?? 0
+  },
+  payment: {
+    method: (o.payment?.method as Order["payment"]["method"]) ?? "cod",
+    fee: o.payment?.fee ?? 0
+  },
+  contact: o.contact ?? { email: "", firstName: "", lastName: "", phone: "" },
+  shipping:
+    o.shipping ?? { line1: "", line2: "", city: "", state: "", postal: "", country: "" },
+  subtotal: o.subtotal,
+  total: o.total,
+  gst: o.gst
+});
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
@@ -171,7 +271,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [drawer, setDrawer] = useState<DrawerKind>(null);
   const [hydrated, setHydrated] = useState(false);
 
-  // Hydrate from localStorage once, client-side only.
+  // Latest token lives in a ref so async callbacks always see the current
+  // value without re-triggering effects.
+  const tokenRef = useRef<string | null>(null);
+  const isSignedIn = () => tokenRef.current != null;
+
+  // Hydrate from localStorage once, client-side only, then — if there's a
+  // stored token — fetch the signed-in view from the backend.
   useEffect(() => {
     setCart(safeParse<CartItem[]>(localStorage.getItem(CART_KEY), []));
     setWishlist(safeParse<string[]>(localStorage.getItem(WISHLIST_KEY), []));
@@ -187,8 +293,50 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       safeParse<CartExtras>(localStorage.getItem(EXTRAS_KEY), DEFAULT_EXTRAS)
     );
     setOrders(safeParse<Order[]>(localStorage.getItem(ORDERS_KEY), []));
+
+    tokenRef.current = getToken();
     setHydrated(true);
   }, []);
+
+  // When hydrated and a token is present, refresh the signed-in view from
+  // the backend (profile, addresses, wishlist, orders). Fallback — DISABLED:
+  // previously any failure here (expired token, server down) silently cleared
+  // the token and continued as guest. Now errors surface to the console so
+  // backend problems are visible during integration.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!tokenRef.current) return;
+
+    let cancelled = false;
+
+    (async () => {
+      const { user: me } = await apiFetch<{ user: BackendUser }>("/api/auth/me");
+      if (cancelled) return;
+
+      setUser({ email: me.email, name: me.name });
+      if (me.addresses) setAddresses(me.addresses.map(toLocalAddress));
+      if (me.wishlist) setWishlist(me.wishlist);
+      if (me.preferences) setPreferences(me.preferences);
+
+      const ordersResp = await apiFetch<{ items: BackendOrder[] }>("/api/orders");
+      if (cancelled) return;
+      setOrders(ordersResp.items.map(toLocalOrder));
+
+      // Guest-fallback catch — DISABLED. Uncomment to restore silent
+      // sign-out when the token is rejected.
+      //
+      // } catch {
+      //   clearToken();
+      //   tokenRef.current = null;
+      // }
+    })().catch((err) => {
+      console.error("[store-provider] failed to refresh signed-in view:", err);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated]);
 
   // Persist. Skip until after hydration so we don't wipe existing storage
   // with the empty initial state on the first render.
@@ -231,6 +379,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const openDrawer = useCallback((kind: DrawerKind) => setDrawer(kind), []);
   const closeDrawer = useCallback(() => setDrawer(null), []);
 
+  // Cart stays client-side regardless of auth state — carts are session
+  // objects, not committed data.
   const addToCart = useCallback((handle: string, qty = 1) => {
     setCart((prev) => {
       const existing = prev.find((i) => i.handle === handle);
@@ -260,12 +410,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setCartExtrasState((prev) => ({ ...prev, ...patch }));
   }, []);
 
+  // Wishlist — optimistic local update; if signed in, mirror to the backend.
   const toggleWishlist = useCallback((handle: string) => {
-    setWishlist((prev) =>
-      prev.includes(handle)
-        ? prev.filter((h) => h !== handle)
-        : [...prev, handle]
-    );
+    let willAdd = false;
+    setWishlist((prev) => {
+      if (prev.includes(handle)) {
+        return prev.filter((h) => h !== handle);
+      }
+      willAdd = true;
+      return [...prev, handle];
+    });
+    if (isSignedIn()) {
+      // Silent-swallow catches — DISABLED. Previously failures here were
+      // swallowed on the assumption local state was "good enough"; now
+      // backend errors surface to the console so they can be noticed.
+      if (willAdd) {
+        apiFetch("/api/users/me/wishlist", {
+          method: "POST",
+          body: JSON.stringify({ handle })
+        }).catch((err) =>
+          console.error("[store-provider] wishlist add failed:", err)
+        );
+      } else {
+        apiFetch(`/api/users/me/wishlist/${encodeURIComponent(handle)}`, {
+          method: "DELETE"
+        }).catch((err) =>
+          console.error("[store-provider] wishlist remove failed:", err)
+        );
+      }
+    }
   }, []);
 
   const isInWishlist = useCallback(
@@ -275,6 +448,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const removeFromWishlist = useCallback((handle: string) => {
     setWishlist((prev) => prev.filter((h) => h !== handle));
+    if (isSignedIn()) {
+      apiFetch(`/api/users/me/wishlist/${encodeURIComponent(handle)}`, {
+        method: "DELETE"
+      }).catch((err) =>
+        console.error("[store-provider] wishlist remove failed:", err)
+      );
+    }
   }, []);
 
   const productByHandle = useCallback(
@@ -282,37 +462,187 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  const signIn = useCallback((email: string, name?: string) => {
-    setUser({ email: email.trim(), name: name?.trim() || undefined });
+  // Auth. The storefront version takes a real password now; the backend
+  // issues a JWT we hold in both the ref and localStorage.
+  const signIn = useCallback(async (email: string, password: string) => {
+    const { token, user: me } = await apiFetch<{
+      token: string;
+      user: BackendUser;
+    }>("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+      auth: false
+    });
+    setToken(token);
+    tokenRef.current = token;
+
+    setUser({ email: me.email, name: me.name });
+    setAddresses((me.addresses || []).map(toLocalAddress));
+
+    // Guest-wishlist merge — DISABLED. Previously, any wishlist handles the
+    // visitor collected before signing in were merged into the server list
+    // on sign-in. Now the server's list is authoritative; local items are
+    // discarded. Uncomment to restore the merge-and-push-local-additions flow.
+    //
+    // const incoming = me.wishlist || [];
+    // setWishlist((prev) => {
+    //   const merged = Array.from(new Set([...incoming, ...prev]));
+    //   prev
+    //     .filter((h) => !incoming.includes(h))
+    //     .forEach((handle) => {
+    //       apiFetch("/api/users/me/wishlist", {
+    //         method: "POST",
+    //         body: JSON.stringify({ handle })
+    //       }).catch(() => {});
+    //     });
+    //   return merged;
+    // });
+    setWishlist(me.wishlist || []);
+
+    if (me.preferences) setPreferences(me.preferences);
+
+    // Orders fetch — the previous try/catch "non-fatal, orders list stays
+    // empty" fallback is DISABLED. Backend errors now propagate so the
+    // sign-in surfaces them.
+    const ordersResp = await apiFetch<{ items: BackendOrder[] }>("/api/orders");
+    setOrders(ordersResp.items.map(toLocalOrder));
   }, []);
 
-  const signOut = useCallback(() => setUser(null), []);
+  const signUp = useCallback(
+    async (email: string, password: string, name?: string) => {
+      const { token, user: me } = await apiFetch<{
+        token: string;
+        user: BackendUser;
+      }>("/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify({ email, password, name }),
+        auth: false
+      });
+      setToken(token);
+      tokenRef.current = token;
+      setUser({ email: me.email, name: me.name });
+      setAddresses([]);
+      // Guest-wishlist carry-over — DISABLED. Previously, any wishlist the
+      // visitor had before registering was kept locally and pushed up to the
+      // new account one item at a time. Now we start from the server's
+      // (empty) list. Uncomment to restore the carry-over.
+      //
+      // setWishlist((prev) => {
+      //   prev.forEach((handle) => {
+      //     apiFetch("/api/users/me/wishlist", {
+      //       method: "POST",
+      //       body: JSON.stringify({ handle })
+      //     }).catch(() => {});
+      //   });
+      //   return prev;
+      // });
+      setWishlist([]);
+    },
+    []
+  );
+
+  const signOut = useCallback(() => {
+    clearToken();
+    tokenRef.current = null;
+    setUser(null);
+    setAddresses([]);
+    setOrders([]);
+    // Wishlist stays — it's useful for guests too.
+  }, []);
 
   const addAddress = useCallback((address: Omit<Address, "id">) => {
-    setAddresses((prev) => [
-      ...prev,
-      { ...address, id: `addr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }
-    ]);
+    // Optimistic add with a temp id; replaced when the server returns.
+    const tempId = `addr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const temp: Address = { ...address, id: tempId };
+    setAddresses((prev) => [...prev, temp]);
+    if (isSignedIn()) {
+      apiFetch<BackendAddress>("/api/users/me/addresses", {
+        method: "POST",
+        body: JSON.stringify(address)
+      })
+        .then((row) => {
+          const saved = toLocalAddress(row);
+          setAddresses((prev) =>
+            prev.map((a) => (a.id === tempId ? saved : a))
+          );
+        })
+        .catch((err) => {
+          // Silent swallow — DISABLED. Previously kept the temp row on
+          // failure so the UI didn't flicker. Now the row is rolled back
+          // and the error is surfaced.
+          console.error("[store-provider] add address failed:", err);
+          setAddresses((prev) => prev.filter((a) => a.id !== tempId));
+        });
+    }
   }, []);
 
   const removeAddress = useCallback((id: string) => {
     setAddresses((prev) => prev.filter((a) => a.id !== id));
+    if (isSignedIn()) {
+      apiFetch(`/api/users/me/addresses/${encodeURIComponent(id)}`, {
+        method: "DELETE"
+      }).catch((err) =>
+        console.error("[store-provider] remove address failed:", err)
+      );
+    }
   }, []);
 
   const updatePreferences = useCallback((patch: Partial<Preferences>) => {
     setPreferences((prev) => ({ ...prev, ...patch }));
-  }, []);
+    if (isSignedIn()) {
+      apiFetch("/api/auth/me", {
+        method: "PATCH",
+        body: JSON.stringify({ preferences: { ...preferences, ...patch } })
+      }).catch((err) =>
+        console.error("[store-provider] update preferences failed:", err)
+      );
+    }
+  }, [preferences]);
 
-  const placeOrder = useCallback((draft: OrderDraft): Order => {
-    const id = `LV-${Date.now().toString().slice(-8)}`;
-    const order: Order = {
-      ...draft,
-      id,
-      placedAt: new Date().toISOString(),
-      status: "placed"
+  const placeOrder = useCallback(async (draft: OrderDraft): Promise<Order> => {
+    // Backend-only. Guest-checkout fallback — DISABLED. Previously if the
+    // visitor wasn't signed in, placeOrder minted a local-only Order and
+    // kept it in localStorage so the confirmation page still rendered.
+    // That hid orders from the admin and bypassed stock/pricing checks.
+    // Uncomment the guest branch at the bottom to restore it.
+    if (!isSignedIn()) {
+      throw new Error("Please sign in to place an order.");
+    }
+
+    const payload = {
+      items: draft.items.map((i) => ({
+        handle: i.handle,
+        qty: i.qty,
+        name: i.name,
+        image: i.image,
+        unitPrice: i.unitPrice,
+        lineTotal: i.lineTotal
+      })),
+      contact: draft.contact,
+      shipping: draft.shipping,
+      delivery: draft.delivery,
+      payment: draft.payment,
+      extras: draft.extras
     };
+    const row = await apiFetch<BackendOrder>("/api/orders", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    const order = toLocalOrder(row);
     setOrders((prev) => [order, ...prev]);
     return order;
+
+    // Guest fallback — DISABLED.
+    //
+    // const id = `LV-${Date.now().toString().slice(-8)}`;
+    // const order: Order = {
+    //   ...draft,
+    //   id,
+    //   placedAt: new Date().toISOString(),
+    //   status: "placed"
+    // };
+    // setOrders((prev) => [order, ...prev]);
+    // return order;
   }, []);
 
   const cancelOrder = useCallback((id: string) => {
@@ -323,6 +653,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           : o
       )
     );
+    if (isSignedIn()) {
+      // Silent swallow — DISABLED. Errors from the cancel round-trip now
+      // surface to the console instead of being discarded.
+      apiFetch<{ items: BackendOrder[] }>(`/api/orders?limit=200`)
+        .then(({ items }) => {
+          const match = items.find((o) => o.ref === id || o.id === id);
+          if (!match) return;
+          return apiFetch(`/api/orders/${match.id}/cancel`, { method: "POST" });
+        })
+        .catch((err) =>
+          console.error("[store-provider] cancel order failed:", err)
+        );
+    }
   }, []);
 
   const orderById = useCallback(
@@ -364,6 +707,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     isInWishlist,
     removeFromWishlist,
     signIn,
+    signUp,
     signOut,
     addAddress,
     removeAddress,

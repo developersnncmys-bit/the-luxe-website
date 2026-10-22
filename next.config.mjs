@@ -14,7 +14,8 @@ const nextConfig = {
     // missing. Unsplash and Pexels are deliberately excluded so no stock
     // imagery can slip into the site.
     remotePatterns: [
-      { protocol: "https", hostname: "picsum.photos" }
+      { protocol: "https", hostname: "picsum.photos" },
+      { protocol: "https", hostname: "res.cloudinary.com" }
     ]
   },
   experimental: {

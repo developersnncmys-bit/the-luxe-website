@@ -8,7 +8,7 @@ import { DrawerShell } from "./drawer-shell";
 type View = "signin" | "register";
 
 export function AccountDrawer() {
-  const { drawer, closeDrawer, user, signIn, signOut, openDrawer } = useStore();
+  const { drawer, closeDrawer, user, signIn, signUp, signOut, openDrawer } = useStore();
   const open = drawer === "account";
 
   return (
@@ -25,17 +25,23 @@ export function AccountDrawer() {
           onClose={closeDrawer}
         />
       ) : (
-        <SignedOutPanel onSubmit={signIn} onClose={closeDrawer} />
+        <SignedOutPanel
+          onSignIn={signIn}
+          onSignUp={signUp}
+          onClose={closeDrawer}
+        />
       )}
     </DrawerShell>
   );
 }
 
 function SignedOutPanel({
-  onSubmit,
+  onSignIn,
+  onSignUp,
   onClose
 }: {
-  onSubmit: (email: string, name?: string) => void;
+  onSignIn: (email: string, password: string) => Promise<void>;
+  onSignUp: (email: string, password: string, name?: string) => Promise<void>;
   onClose: () => void;
 }) {
   const [view, setView] = useState<View>("signin");
@@ -43,8 +49,9 @@ function SignedOutPanel({
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const trimmed = email.trim();
     if (!trimmed || !trimmed.includes("@")) {
@@ -56,7 +63,19 @@ function SignedOutPanel({
       return;
     }
     setError("");
-    onSubmit(trimmed, view === "register" ? name : undefined);
+    setSubmitting(true);
+    try {
+      if (view === "register") {
+        await onSignUp(trimmed, password, name.trim() || undefined);
+      } else {
+        await onSignIn(trimmed, password);
+      }
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -128,9 +147,16 @@ function SignedOutPanel({
 
         <button
           type="submit"
-          className="w-full bg-chalk py-4 text-[11px] font-semibold uppercase tracking-[0.28em] text-ink transition-opacity hover:opacity-90"
+          disabled={submitting}
+          className="w-full bg-chalk py-4 text-[11px] font-semibold uppercase tracking-[0.28em] text-ink transition-opacity hover:opacity-90 disabled:opacity-50"
         >
-          {view === "signin" ? "Sign In" : "Create Account"}
+          {submitting
+            ? view === "signin"
+              ? "Signing in…"
+              : "Creating account…"
+            : view === "signin"
+              ? "Sign In"
+              : "Create Account"}
         </button>
 
         <div className="pt-6">

@@ -112,6 +112,7 @@ export function CheckoutForm() {
     addAddress,
     clearCart,
     signIn,
+    signUp,
     placeOrder
   } = useStore();
 
@@ -186,7 +187,7 @@ export function CheckoutForm() {
     return new Set(missing);
   }, [contact]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAttempted(true);
     if (invalidFields.size > 0) {
@@ -243,30 +244,37 @@ export function CheckoutForm() {
     // pushes it to the orders list. We stash the id in sessionStorage so the
     // confirmation page knows which order was just placed — the order itself
     // is read live from the store, so cancel/status updates reflect instantly.
-    const order = placeOrder(draft);
     try {
-      sessionStorage.setItem("tlv:last-order-id", order.id);
-    } catch {
-      // Quota errors are harmless — confirmation page falls back on redirect.
-    }
+      const order = await placeOrder(draft);
+      try {
+        sessionStorage.setItem("tlv:last-order-id", order.id);
+      } catch {
+        // Quota errors are harmless — confirmation page falls back on redirect.
+      }
 
-    // If the visitor filled a new address and ticked "save this address", add
-    // it to their account book for next time. Only possible when signed in.
-    if (user && !selectedAddressId && saveNewAddress) {
-      addAddress({
-        name: `${contact.firstName} ${contact.lastName}`.trim(),
-        line1: contact.line1,
-        line2: contact.line2 || undefined,
-        city: contact.city,
-        state: contact.state,
-        postal: contact.postal,
-        country: contact.country,
-        phone: contact.phone || undefined
-      });
-    }
+      // If the visitor filled a new address and ticked "save this address", add
+      // it to their account book for next time. Only possible when signed in.
+      if (user && !selectedAddressId && saveNewAddress) {
+        addAddress({
+          name: `${contact.firstName} ${contact.lastName}`.trim(),
+          line1: contact.line1,
+          line2: contact.line2 || undefined,
+          city: contact.city,
+          state: contact.state,
+          postal: contact.postal,
+          country: contact.country,
+          phone: contact.phone || undefined
+        });
+      }
 
-    clearCart();
-    router.push("/checkout/confirmation");
+      clearCart();
+      router.push("/checkout/confirmation");
+    } catch (err) {
+      setSubmitting(false);
+      // Surface the backend message if present (e.g. unavailable items).
+      // Falls back to a scroll-to-top so the (yet-to-be-added) toast would show.
+      alert(err instanceof Error ? err.message : "Could not place the order. Please try again.");
+    }
   };
 
   if (cart.length === 0) {
@@ -283,7 +291,8 @@ export function CheckoutForm() {
         <CheckoutChrome />
         <CheckoutLoginGate
           onGuest={() => setGuestMode(true)}
-          onSignIn={(email, name) => signIn(email, name)}
+          onSignIn={signIn}
+          onSignUp={signUp}
         />
       </div>
     );
@@ -761,18 +770,21 @@ function SummaryLine({
 
 function CheckoutLoginGate({
   onGuest,
-  onSignIn
+  onSignIn,
+  onSignUp
 }: {
   onGuest: () => void;
-  onSignIn: (email: string, name?: string) => void;
+  onSignIn: (email: string, password: string) => Promise<void>;
+  onSignUp: (email: string, password: string, name?: string) => Promise<void>;
 }) {
   const [mode, setMode] = useState<"signin" | "register">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = email.trim();
     if (!trimmed || !trimmed.includes("@")) {
@@ -784,7 +796,18 @@ function CheckoutLoginGate({
       return;
     }
     setError("");
-    onSignIn(trimmed, mode === "register" ? name.trim() || undefined : undefined);
+    setSubmitting(true);
+    try {
+      if (mode === "register") {
+        await onSignUp(trimmed, password, name.trim() || undefined);
+      } else {
+        await onSignIn(trimmed, password);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -854,9 +877,16 @@ function CheckoutLoginGate({
 
         <button
           type="submit"
-          className="w-full bg-ink py-5 text-[11px] font-semibold uppercase tracking-[0.3em] text-chalk transition-opacity hover:opacity-90"
+          disabled={submitting}
+          className="w-full bg-ink py-5 text-[11px] font-semibold uppercase tracking-[0.3em] text-chalk transition-opacity hover:opacity-90 disabled:opacity-50"
         >
-          {mode === "signin" ? "Sign in" : "Create account & continue"}
+          {submitting
+            ? mode === "signin"
+              ? "Signing in…"
+              : "Creating account…"
+            : mode === "signin"
+              ? "Sign in"
+              : "Create account & continue"}
         </button>
       </form>
 

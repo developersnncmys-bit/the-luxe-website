@@ -5,7 +5,33 @@ import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
 
-export function EditHero() {
+// Hardcoded defaults — DISABLED. Backend-only now. Uncomment to restore
+// the hardcoded "edit-hero.png" + "Begin the selection" fallback used
+// when no banner is authored for page: 'edit'.
+//
+// const DEFAULT_IMAGE = "/images/edit-hero.png";
+// const DEFAULT_IMAGE_ALT = "The Edit — a curated selection of pieces";
+// const DEFAULT_CTA_LABEL = "Begin the selection";
+// const DEFAULT_CTA_HREF = "#statement";
+
+// Backend hero banner override (type: 'hero', page: 'edit').
+export type EditHeroProps = {
+  image?: string;
+  imageAlt?: string;
+  ctaLabel?: string;
+  ctaHref?: string;
+};
+
+export function EditHero({
+  image,
+  imageAlt,
+  ctaLabel,
+  ctaHref
+}: EditHeroProps = {}) {
+  const resolvedImage = image || "";
+  const resolvedImageAlt = imageAlt || "";
+  const resolvedCtaLabel = ctaLabel || "";
+  const resolvedCtaHref = ctaHref || "";
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
@@ -24,8 +50,8 @@ export function EditHero() {
       {/* Parallax cover — quieter than /collections; heavier wash so title dominates. */}
       <motion.div style={{ y, scale }} className="absolute inset-0">
         <Image
-          src="/images/edit-hero.png"
-          alt="The Edit — a curated selection of pieces"
+          src={resolvedImage}
+          alt={resolvedImageAlt}
           fill
           priority
           sizes="100vw"
@@ -38,8 +64,8 @@ export function EditHero() {
         style={{ opacity }}
         className="absolute inset-x-0 bottom-10 z-10 flex justify-center md:bottom-14"
       >
-        <Link href="#statement" className="cta-rule text-chalk">
-          Begin the selection
+        <Link href={resolvedCtaHref} className="cta-rule text-chalk">
+          {resolvedCtaLabel}
         </Link>
       </motion.div>
     </section>

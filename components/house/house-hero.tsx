@@ -5,7 +5,33 @@ import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
 
-export function HouseHero() {
+// Hardcoded defaults — DISABLED. Backend-only now. Uncomment to restore
+// the hardcoded "house-hero.png" + "Enter the house" fallback used when
+// no banner is authored for page: 'house'.
+//
+// const DEFAULT_IMAGE = "/images/house-hero.png";
+// const DEFAULT_IMAGE_ALT = "The House — the studio at dusk";
+// const DEFAULT_CTA_LABEL = "Enter the house";
+// const DEFAULT_CTA_HREF = "#point-of-view";
+
+// Backend hero banner override (type: 'hero', page: 'house').
+export type HouseHeroProps = {
+  image?: string;
+  imageAlt?: string;
+  ctaLabel?: string;
+  ctaHref?: string;
+};
+
+export function HouseHero({
+  image,
+  imageAlt,
+  ctaLabel,
+  ctaHref
+}: HouseHeroProps = {}) {
+  const resolvedImage = image || "";
+  const resolvedImageAlt = imageAlt || "";
+  const resolvedCtaLabel = ctaLabel || "";
+  const resolvedCtaHref = ctaHref || "";
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
@@ -23,8 +49,8 @@ export function HouseHero() {
     >
       <motion.div style={{ y, scale }} className="absolute inset-0">
         <Image
-          src="/images/house-hero.png"
-          alt="The House — the studio at dusk"
+          src={resolvedImage}
+          alt={resolvedImageAlt}
           fill
           priority
           sizes="100vw"
@@ -75,8 +101,8 @@ export function HouseHero() {
         style={{ opacity }}
         className="absolute inset-x-0 bottom-10 z-10 flex justify-center md:bottom-14"
       >
-        <Link href="#point-of-view" className="cta-rule text-chalk">
-          Enter the house
+        <Link href={resolvedCtaHref} className="cta-rule text-chalk">
+          {resolvedCtaLabel}
         </Link>
       </motion.div>
     </section>
