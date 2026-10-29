@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Inter_Tight, Noto_Serif_Display } from "next/font/google";
+import localFont from "next/font/local";
 import { SmoothScroll } from "@/components/site/smooth-scroll";
 import { SiteChrome } from "@/components/site/site-chrome";
 import { ScrollTopOnRoute } from "@/components/site/scroll-top-on-route";
@@ -8,31 +8,40 @@ import { StoreProvider } from "@/components/store/store-provider";
 import { StoreMount } from "@/components/store/store-mount";
 import "./globals.css";
 
-const display = Inter_Tight({
-  subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
+// Self-hosted via /public/fonts to avoid flaky Google Fonts fetches during
+// Vercel builds (previously crashed deploy with
+// `TypeError: Cannot read properties of null (reading '1')` in next/font/google).
+const display = localFont({
+  src: [
+    { path: "../public/fonts/InterTight-Medium.ttf", weight: "500", style: "normal" },
+    { path: "../public/fonts/InterTight-SemiBold.ttf", weight: "600", style: "normal" },
+    { path: "../public/fonts/InterTight-Bold.ttf", weight: "700", style: "normal" },
+    { path: "../public/fonts/InterTight-ExtraBold.ttf", weight: "800", style: "normal" }
+  ],
   variable: "--font-display",
   display: "swap"
 });
 
-const sans = Inter({
-  subsets: ["latin"],
-  weight: ["300", "400", "500"],
+const sans = localFont({
+  src: [
+    { path: "../public/fonts/Inter_18pt-Light.ttf", weight: "300", style: "normal" },
+    { path: "../public/fonts/Inter_18pt-Regular.ttf", weight: "400", style: "normal" },
+    { path: "../public/fonts/Inter_18pt-Medium.ttf", weight: "500", style: "normal" }
+  ],
   variable: "--font-sans",
   display: "swap"
 });
 
-// Trimmed from 5 weights × 2 styles (10 combinations) → 2 × 2 (4). Grep of
-// the codebase shows `--font-serif-display` is only used with `font-light`
-// (300) and `font-normal` (400), both normal and italic — the 500/600/700
-// weights were loaded but never referenced. Fewer variants = fewer chances
-// for `next/font` to choke on a flaky Google Fonts response during Vercel
-// builds (which was crashing the deploy with
-// `TypeError: Cannot read properties of null (reading '1')`).
-const serifDisplay = Noto_Serif_Display({
-  subsets: ["latin"],
-  weight: ["300", "400"],
-  style: ["normal", "italic"],
+// Only Light (300) and Regular (400), both normal + italic — matches actual
+// usage in the codebase (--font-serif-display is only used with font-light
+// and font-normal).
+const serifDisplay = localFont({
+  src: [
+    { path: "../public/fonts/NotoSerifDisplay-Light.ttf", weight: "300", style: "normal" },
+    { path: "../public/fonts/NotoSerifDisplay-LightItalic.ttf", weight: "300", style: "italic" },
+    { path: "../public/fonts/NotoSerifDisplay-Regular.ttf", weight: "400", style: "normal" },
+    { path: "../public/fonts/NotoSerifDisplay-Italic.ttf", weight: "400", style: "italic" }
+  ],
   variable: "--font-serif-display",
   display: "swap"
 });
