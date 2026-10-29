@@ -109,13 +109,17 @@ export function ObjectsCatalog({
     setSelectedPrices(new Set());
   };
 
-  // Build a thumbnail per chip: first product in that category, or the first
-  // product overall for the "all" chip. Purely visual — clickability lives
-  // on the surrounding button.
+  // Build a thumbnail per chip. Primary source is the Category's `image`
+  // (the admin's "Tile image" field) so the circle reflects an editorial
+  // choice, not whatever product happens to sit first in the category.
+  // Falls back to the first product in that category when the admin hasn't
+  // uploaded a tile yet. Purely visual — clickability lives on the
+  // surrounding button.
   const chipImages = useMemo(() => {
     const allOverride = categories.find(
       (c) => c.id === ALL_OBJECTS_OVERRIDE_SLUG
     );
+    const byId = new Map(categories.map((c) => [c.id, c]));
     const map = new Map<FilterId, { src: string; seed: string }>();
     CHIPS.forEach((c) => {
       if (c.id === "all") {
@@ -124,9 +128,10 @@ export function ObjectsCatalog({
           seed: "chip-all"
         });
       } else {
+        const cat = byId.get(c.id);
         const first = products.find((p) => p.category === c.match);
         map.set(c.id, {
-          src: first?.image ?? "",
+          src: cat?.image || first?.image || "",
           seed: `chip-${c.id}`
         });
       }
