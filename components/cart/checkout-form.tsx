@@ -113,6 +113,7 @@ export function CheckoutForm() {
     clearCart,
     signIn,
     signUp,
+    signOut,
     placeOrder
   } = useStore();
 
@@ -140,6 +141,7 @@ export function CheckoutForm() {
     () => (user && addresses.length > 0 ? addresses[0].id : null)
   );
   const [saveNewAddress, setSaveNewAddress] = useState(false);
+  const [addressSaveNotice, setAddressSaveNotice] = useState("");
 
   // When a saved address is picked, mirror its fields into `contact` so the
   // rest of the submit path doesn't need to know whether the data came from
@@ -178,6 +180,56 @@ export function CheckoutForm() {
 
   const updateContact = (patch: Partial<ContactShipping>) =>
     setContact((prev) => ({ ...prev, ...patch }));
+
+  // Save the currently-filled address to the account book immediately,
+  // without placing an order. Lets a signed-in visitor collect more than
+  // one address during checkout — the saved-address picker above the
+  // manual form updates as each one lands. Address fields only; email is
+  // a contact-level concern and left untouched.
+  const handleSaveAddress = () => {
+    const addressKeys: Array<keyof ContactShipping> = [
+      "firstName",
+      "lastName",
+      "line1",
+      "city",
+      "state",
+      "postal",
+      "country"
+    ];
+    const missing = addressKeys.filter((k) => !contact[k].trim());
+    if (missing.length > 0) {
+      setAttempted(true);
+      setAddressSaveNotice("");
+      return;
+    }
+    addAddress({
+      name: `${contact.firstName} ${contact.lastName}`.trim(),
+      line1: contact.line1,
+      line2: contact.line2 || undefined,
+      city: contact.city,
+      state: contact.state,
+      postal: contact.postal,
+      country: contact.country,
+      phone: contact.phone || undefined
+    });
+    // Clear the address fields so the user can enter another; keep
+    // email/phone paths untouched. Flip back to "Use a new address" mode
+    // in case the picker was previously pointed at a saved row.
+    setContact((prev) => ({
+      ...prev,
+      firstName: "",
+      lastName: "",
+      line1: "",
+      line2: "",
+      city: "",
+      state: "",
+      postal: "",
+      country: ""
+    }));
+    setSelectedAddressId(null);
+    setSaveNewAddress(false);
+    setAddressSaveNotice("Address saved. You can enter another below.");
+  };
 
   const invalidFields = useMemo(() => {
     const missing: string[] = [];
@@ -293,6 +345,7 @@ export function CheckoutForm() {
           onGuest={() => setGuestMode(true)}
           onSignIn={signIn}
           onSignUp={signUp}
+          onSignOut={signOut}
         />
       </div>
     );
@@ -463,17 +516,37 @@ export function CheckoutForm() {
                   onChange={(v) => updateContact({ phone: v })}
                 />
 
-                {/* Save-to-account checkbox — only for signed-in visitors. */}
+                {/* Save-to-account options — only for signed-in visitors.
+                    The checkbox saves on order submit; the button saves
+                    immediately and clears the form so the visitor can
+                    collect multiple addresses in one checkout. */}
                 {user && (
-                  <label className="flex cursor-pointer items-center gap-3 pt-2 text-[12px] text-ink/80">
-                    <input
-                      type="checkbox"
-                      checked={saveNewAddress}
-                      onChange={(e) => setSaveNewAddress(e.target.checked)}
-                      className="h-4 w-4 accent-ink"
-                    />
-                    <span>Save this address to my account</span>
-                  </label>
+                  <div className="space-y-3 pt-2">
+                    <label className="flex cursor-pointer items-center gap-3 text-[12px] text-ink/80">
+                      <input
+                        type="checkbox"
+                        checked={saveNewAddress}
+                        onChange={(e) => setSaveNewAddress(e.target.checked)}
+                        className="h-4 w-4 accent-ink"
+                      />
+                      <span>Save this address to my account</span>
+                    </label>
+
+                    <div className="flex flex-wrap items-center gap-4">
+                      <button
+                        type="button"
+                        onClick={handleSaveAddress}
+                        className="inline-flex items-center justify-center border border-ink px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-ink transition-colors duration-500 ease-silk hover:bg-ink hover:text-chalk"
+                      >
+                        + Save & add another
+                      </button>
+                      {addressSaveNotice && (
+                        <span className="text-[11px] uppercase tracking-[0.2em] text-ink/70">
+                          {addressSaveNotice}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             )}
@@ -771,17 +844,20 @@ function SummaryLine({
 function CheckoutLoginGate({
   onGuest,
   onSignIn,
-  onSignUp
+  onSignUp,
+  onSignOut
 }: {
   onGuest: () => void;
   onSignIn: (email: string, password: string) => Promise<void>;
   onSignUp: (email: string, password: string, name?: string) => Promise<void>;
+  onSignOut: () => void;
 }) {
   const [mode, setMode] = useState<"signin" | "register">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -796,10 +872,19 @@ function CheckoutLoginGate({
       return;
     }
     setError("");
+    setNotice("");
     setSubmitting(true);
     try {
       if (mode === "register") {
         await onSignUp(trimmed, password, name.trim() || undefined);
+        // Backend register auto-issues a session; clear it so the user is
+        // not silently signed in, then drop them on the Sign In tab with
+        // their email prefilled so they can log in and continue checkout.
+        onSignOut();
+        setMode("signin");
+        setPassword("");
+        setName("");
+        setNotice("Account created. Please sign in to continue.");
       } else {
         await onSignIn(trimmed, password);
       }
@@ -851,9 +936,8 @@ function CheckoutLoginGate({
           autoComplete="email"
           required
         />
-        <GateField
+        <GatePasswordField
           label="Password"
-          type="password"
           value={password}
           onChange={setPassword}
           autoComplete={mode === "signin" ? "current-password" : "new-password"}
@@ -872,6 +956,12 @@ function CheckoutLoginGate({
         {error && (
           <p className="text-[12px] uppercase tracking-[0.22em] text-red-600">
             {error}
+          </p>
+        )}
+
+        {notice && !error && (
+          <p className="text-[12px] uppercase tracking-[0.22em] text-ink/70">
+            {notice}
           </p>
         )}
 
@@ -971,6 +1061,84 @@ function GateField({
         required={required}
         className="w-full border-b border-ink/25 bg-transparent py-2 text-[14px] text-ink placeholder:text-ink/40 transition-colors focus:border-ink focus:outline-none"
       />
+    </label>
+  );
+}
+
+// Password input for the checkout gate (light background), with a
+// show/hide toggle. Mirrors GateField styling and keeps autocomplete
+// hints so password managers keep working.
+function GatePasswordField({
+  label,
+  value,
+  onChange,
+  autoComplete,
+  required
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  autoComplete?: string;
+  required?: boolean;
+}) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <label className="block">
+      <span className="mb-2 block text-[10px] uppercase tracking-[0.32em] text-ink/60">
+        {label}
+        {required && <span className="ml-1 text-ink/40">*</span>}
+      </span>
+      <div className="relative">
+        <input
+          type={visible ? "text" : "password"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          autoComplete={autoComplete}
+          required={required}
+          className="w-full border-b border-ink/25 bg-transparent py-2 pr-10 text-[14px] text-ink placeholder:text-ink/40 transition-colors focus:border-ink focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={() => setVisible((v) => !v)}
+          aria-label={visible ? "Hide password" : "Show password"}
+          aria-pressed={visible}
+          className="absolute inset-y-0 right-0 flex items-center px-2 text-ink/55 transition-colors hover:text-ink"
+        >
+          {visible ? (
+            <svg
+              viewBox="0 0 20 20"
+              width="18"
+              height="18"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M3 3l14 14" />
+              <path d="M8.2 5.1A9 9 0 0 1 10 5c5.5 0 8.5 5 8.5 5a14.5 14.5 0 0 1-2.6 3.2" />
+              <path d="M6.1 6.6C3.5 8.1 1.5 10 1.5 10S4.5 15 10 15c1.3 0 2.4-.3 3.4-.7" />
+              <path d="M8.4 8.4a2.5 2.5 0 0 0 3.3 3.3" />
+            </svg>
+          ) : (
+            <svg
+              viewBox="0 0 20 20"
+              width="18"
+              height="18"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M1.5 10S4.5 4 10 4s8.5 6 8.5 6-3 6-8.5 6S1.5 10 1.5 10Z" />
+              <circle cx="10" cy="10" r="2.5" />
+            </svg>
+          )}
+        </button>
+      </div>
     </label>
   );
 }

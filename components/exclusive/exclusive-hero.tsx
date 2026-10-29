@@ -34,7 +34,7 @@ export function ExclusiveHero() {
         <div className="absolute inset-0 bg-ink/65" />
       </motion.div>
 
-      <div className="relative z-10 flex h-full flex-col items-center justify-center px-6 text-center">
+      <div className="relative z-10 flex h-full flex-col items-start justify-center px-6 text-left md:px-16">
         <motion.p
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
@@ -49,7 +49,7 @@ export function ExclusiveHero() {
           initial={{ opacity: 0, y: 26 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1.3, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
-          className="font-display text-[clamp(2.5rem,7vw,6rem)] font-light uppercase leading-[0.95] tracking-[0.02em]"
+          className="font-display text-[clamp(1.75rem,4.5vw,4rem)] font-light uppercase leading-[0.95] tracking-[0.02em]"
         >
           Luxe Exclusive
         </motion.h1>
@@ -59,7 +59,7 @@ export function ExclusiveHero() {
           initial={{ opacity: 0, scaleX: 0 }}
           animate={{ opacity: 1, scaleX: 1 }}
           transition={{ duration: 1.1, delay: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          className="mt-10 block h-px w-20 origin-center bg-chalk/50"
+          className="mt-10 block h-px w-20 origin-left bg-chalk/50"
         />
 
         <motion.p
@@ -75,7 +75,7 @@ export function ExclusiveHero() {
 
       <motion.div
         style={{ opacity }}
-        className="absolute inset-x-0 bottom-10 z-10 flex justify-center md:bottom-14"
+        className="absolute inset-x-0 bottom-10 z-10 flex justify-start px-6 md:bottom-14 md:px-16"
       >
         <Link href="#piece-i" className="cta-rule text-chalk">
           Begin the line

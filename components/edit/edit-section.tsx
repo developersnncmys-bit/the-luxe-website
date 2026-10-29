@@ -77,17 +77,10 @@ export function EditSection({
               {intro}
             </motion.p>
 
-            {description && (
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-15% 0px" }}
-                transition={{ duration: 1.2, delay: 0.28, ease: [0.22, 1, 0.36, 1] }}
-                className="mt-6 max-w-sm text-[13px] leading-[1.8] text-chalk/70"
-              >
-                {description}
-              </motion.p>
-            )}
+            {/* Description was previously rendered here below the tagline.
+                Moved to the right column under the feature piece name to
+                match the deployed reference layout (title → description →
+                CTA, all beside the image). */}
 
             <motion.div
               initial={{ opacity: 0, y: 14 }}
@@ -114,8 +107,8 @@ export function EditSection({
               mirror ? "md:col-start-1 md:row-start-1" : "md:col-start-8"
             )}
           >
-            {(featureImage || featuredPieceName) && (
-              <motion.figure
+            {(featureImage || featuredPieceName || description) && (
+              <motion.article
                 initial={{ opacity: 0, y: 40 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-10% 0px" }}
@@ -134,12 +127,36 @@ export function EditSection({
                     />
                   </div>
                 )}
-                {featuredPieceName && (
-                  <figcaption className="mt-6 text-[11px] uppercase tracking-[0.26em] text-chalk/70">
-                    {featuredPieceName}
-                  </figcaption>
-                )}
-              </motion.figure>
+
+                {/* Prominent title → description → CTA cluster, matching the
+                    deployed reference layout. The admin-authored
+                    `featuredPieceName` becomes the big display heading, not
+                    a small caption. */}
+                <div className="mt-8 flex flex-col gap-4">
+                  {featuredPieceName && (
+                    <h3 className="font-display text-[clamp(1.25rem,2vw,1.75rem)] font-semibold uppercase leading-[1.1] tracking-[0.005em]">
+                      {featuredPieceName}
+                    </h3>
+                  )}
+                  {description && (
+                    <p className="max-w-[46ch] text-[13px] leading-[1.7] text-chalk/75">
+                      {description}
+                    </p>
+                  )}
+                  {/* "Discover the piece" CTA — links to the first product
+                      in this edit when available. Hidden otherwise. Later we
+                      can add an explicit CTA href field on EditTag if admins
+                      want to point elsewhere. */}
+                  {products[0] && (
+                    <Link
+                      href={productHref(products[0])}
+                      className="mt-2 inline-block text-[11px] font-semibold uppercase tracking-[0.24em] text-chalk underline underline-offset-[6px] decoration-chalk/50 transition-colors hover:decoration-chalk"
+                    >
+                      Discover the piece
+                    </Link>
+                  )}
+                </div>
+              </motion.article>
             )}
 
             {products.map((p) => (

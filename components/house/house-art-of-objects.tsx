@@ -3,7 +3,27 @@
 import Image from "next/image";
 import { motion } from "framer-motion";
 
-export function HouseArtOfObjects() {
+// Admin override props for the full-bleed closing image + caption. Both
+// optional — defaults keep the section rendering when no banner is authored.
+export type HouseArtOfObjectsProps = {
+  featureImage?: string;            // overrides the big full-bleed image
+  featureImageAttribution?: string; // overrides the small caption below it
+};
+
+const DEFAULT_FEATURE_IMAGE = "/images/house.png";
+const DEFAULT_FEATURE_IMAGE_ALT =
+  "A single sculpted form — the room around it, kept quiet";
+const DEFAULT_FEATURE_IMAGE_ATTRIBUTION = "Objet · Sillon — cast bronze";
+
+export function HouseArtOfObjects({
+  featureImage,
+  featureImageAttribution
+}: HouseArtOfObjectsProps = {}) {
+  const resolvedImage = featureImage || DEFAULT_FEATURE_IMAGE;
+  const resolvedAttribution =
+    featureImageAttribution || DEFAULT_FEATURE_IMAGE_ATTRIBUTION;
+  const resolvedAlt = featureImageAttribution || DEFAULT_FEATURE_IMAGE_ALT;
+
   return (
     <section
       className="relative bg-ink py-32 text-chalk md:py-44"
@@ -58,15 +78,15 @@ export function HouseArtOfObjects() {
         >
           <div className="relative aspect-[16/9] w-full overflow-hidden bg-onyx">
             <Image
-              src="/images/house.png"
-              alt="A single sculpted form — the room around it, kept quiet"
+              src={resolvedImage}
+              alt={resolvedAlt}
               fill
               sizes="100vw"
               className="object-cover"
             />
           </div>
           <p className="mt-6 text-[10px] uppercase tracking-[0.32em] text-chalk/40">
-            Objet · Sillon — cast bronze
+            {resolvedAttribution}
           </p>
         </motion.div>
       </div>

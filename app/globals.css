@@ -66,8 +66,13 @@ html.lenis, html.lenis body {
   transition: background-color 500ms cubic-bezier(0.22, 1, 0.36, 1),
               color 500ms cubic-bezier(0.22, 1, 0.36, 1);
 }
+/* Explicit chalk fill on hover — `background-color: currentColor` cannot
+   be used here because `color: var(--ink)` in the same rule makes
+   `currentColor` resolve to ink, which would paint the button entirely
+   dark and swallow its label. The `--dark` variant below overrides this
+   for CTAs that sit on light backgrounds. */
 .cta-outline:hover {
-  background-color: currentColor;
+  background-color: var(--chalk);
   color: var(--ink);
 }
 .cta-outline--dark:hover { color: var(--chalk); background-color: var(--ink); }

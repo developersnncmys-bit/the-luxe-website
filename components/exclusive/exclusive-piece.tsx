@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { SafeImage } from "@/components/ui/safe-image";
+import { useStore } from "@/components/store/store-provider";
 import type { ExclusivePiece } from "@/lib/content";
 
 // A single made-to-order piece — image on one side, caption on the other,
@@ -16,6 +17,21 @@ export function ExclusivePiece({
   index: number;
 }) {
   const mirror = index % 2 === 1;
+  const { addToCart, openDrawer } = useStore();
+
+  // Inline spec rail — mirrors the featured piece's style. Material,
+  // dimensions and lead time join on " · " and render as one tracked-caps
+  // paragraph instead of a stacked label/value table.
+  const specBits: string[] = [];
+  if (piece.material) specBits.push(piece.material);
+  if (piece.dimensions) specBits.push(piece.dimensions);
+  if (piece.leadTime) specBits.push(`Lead time ${piece.leadTime}`);
+  const specLine = specBits.join(" · ").toUpperCase();
+
+  const handleAddToBag = () => {
+    addToCart(piece.slug, 1);
+    openDrawer("cart");
+  };
 
   return (
     <section
@@ -23,7 +39,7 @@ export function ExclusivePiece({
       aria-labelledby={`piece-${piece.slug}-heading`}
       className="relative bg-ink text-chalk"
     >
-      <div className="mx-auto grid max-w-editorial grid-cols-1 items-center gap-10 px-6 py-24 md:grid-cols-12 md:gap-12 md:px-14 md:py-36 lg:gap-20">
+      <div className="mx-auto grid max-w-editorial grid-cols-1 items-center gap-10 px-6 py-12 md:grid-cols-12 md:gap-12 md:px-14 md:py-16 lg:gap-20">
         {/* Image column */}
         <motion.figure
           initial={{ opacity: 0, y: 28 }}
@@ -61,7 +77,7 @@ export function ExclusivePiece({
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-20% 0px" }}
             transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-            className="block font-[family-name:var(--font-serif-display)] text-[clamp(3rem,5vw,4.5rem)] font-light italic leading-[0.85] text-chalk/20"
+            className="block font-[family-name:var(--font-serif-display)] text-[clamp(1.5rem,2vw,2rem)] font-light italic leading-[0.85] text-[#d9c6a6cc]"
           >
             {piece.number}
           </motion.span>
@@ -87,15 +103,17 @@ export function ExclusivePiece({
             {piece.name}
           </motion.h2>
 
-          <motion.p
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-20% 0px" }}
-            transition={{ duration: 1.1, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            className="mt-5 font-display text-[clamp(0.95rem,1.1vw,1.05rem)] italic text-chalk/70"
-          >
-            {piece.intro}
-          </motion.p>
+          {(piece.tagline || piece.intro) && (
+            <motion.p
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-20% 0px" }}
+              transition={{ duration: 1.1, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              className="mt-5 font-display text-[clamp(0.95rem,1.1vw,1.05rem)] italic text-chalk/70"
+            >
+              {piece.tagline || piece.intro}
+            </motion.p>
+          )}
 
           <motion.span
             aria-hidden
@@ -116,46 +134,59 @@ export function ExclusivePiece({
             {piece.body}
           </motion.p>
 
-          {/* Spec rail */}
-          <motion.dl
-            initial={{ opacity: 0, y: 14 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-20% 0px" }}
-            transition={{ duration: 1.1, delay: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            className="mt-10 divide-y divide-chalk/10 border-y border-chalk/10"
-          >
-            {[
-              { label: "Material", value: piece.material },
-              { label: "Dimensions", value: piece.dimensions },
-              { label: "Lead time", value: piece.leadTime },
-              { label: "Edition", value: piece.edition }
-            ].map((row) => (
-              <div
-                key={row.label}
-                className="flex items-baseline justify-between gap-6 py-3"
-              >
-                <dt className="text-[10px] uppercase tracking-[0.3em] text-chalk/50">
-                  {row.label}
-                </dt>
-                <dd className="text-right text-[12px] tracking-[0.04em] text-chalk/85">
-                  {row.value}
-                </dd>
-              </div>
-            ))}
-          </motion.dl>
+          {specLine && (
+            <motion.p
+              initial={{ opacity: 0, y: 14 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-20% 0px" }}
+              transition={{ duration: 1.1, delay: 0.7, ease: [0.22, 1, 0.36, 1] }}
+              className="mt-10 text-[10px] uppercase leading-[1.9] tracking-[0.26em] text-chalk/70"
+            >
+              {specLine}
+            </motion.p>
+          )}
 
           <motion.div
             initial={{ opacity: 0, y: 14 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-20% 0px" }}
             transition={{ duration: 1.1, delay: 0.85, ease: [0.22, 1, 0.36, 1] }}
-            className="mt-10"
+            className="mt-10 flex flex-wrap items-start justify-between gap-6"
           >
-            <a
-              href={`/studio/appointment?piece=${piece.slug}`}
+            <div>
+              {typeof piece.price === "number" && piece.price > 0 && (
+                <p className="text-[15px] tracking-[0.04em] text-chalk">
+                  ₹ {piece.price.toLocaleString("en-IN")}
+                  <span className="text-chalk/55">*</span>
+                </p>
+              )}
+              {piece.edition && (
+                <p className="mt-2 text-[10px] uppercase tracking-[0.3em] text-chalk/55">
+                  {piece.edition}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={handleAddToBag}
               className="inline-flex items-center justify-center border border-chalk bg-chalk px-10 py-4 text-[11px] font-semibold uppercase tracking-[0.28em] text-ink transition-colors duration-500 ease-silk hover:bg-transparent hover:text-chalk"
             >
-              Request to Order
+              Add to Bag
+            </button>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-20% 0px" }}
+            transition={{ duration: 1, delay: 1, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-8"
+          >
+            <a
+              href={`#piece-${piece.number.toLowerCase()}`}
+              className="inline-block border-b border-chalk/30 pb-1 text-[11px] font-semibold uppercase tracking-[0.3em] text-chalk/80 transition-colors duration-500 ease-silk hover:border-chalk hover:text-chalk"
+            >
+              View the Piece
             </a>
           </motion.div>
         </div>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { useStore } from "./store-provider";
 import { DrawerShell } from "./drawer-shell";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type View = "signin" | "register";
 
@@ -28,6 +29,7 @@ export function AccountDrawer() {
         <SignedOutPanel
           onSignIn={signIn}
           onSignUp={signUp}
+          onSignOut={signOut}
           onClose={closeDrawer}
         />
       )}
@@ -38,10 +40,12 @@ export function AccountDrawer() {
 function SignedOutPanel({
   onSignIn,
   onSignUp,
+  onSignOut,
   onClose
 }: {
   onSignIn: (email: string, password: string) => Promise<void>;
   onSignUp: (email: string, password: string, name?: string) => Promise<void>;
+  onSignOut: () => void;
   onClose: () => void;
 }) {
   const [view, setView] = useState<View>("signin");
@@ -49,6 +53,7 @@ function SignedOutPanel({
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -63,14 +68,23 @@ function SignedOutPanel({
       return;
     }
     setError("");
+    setNotice("");
     setSubmitting(true);
     try {
       if (view === "register") {
         await onSignUp(trimmed, password, name.trim() || undefined);
+        // Backend register auto-issues a session; clear it so the account
+        // isn't silently signed in, then drop the user on the Sign In form
+        // with their email prefilled.
+        onSignOut();
+        setView("signin");
+        setPassword("");
+        setName("");
+        setNotice("Account created. Please sign in to continue.");
       } else {
         await onSignIn(trimmed, password);
+        onClose();
       }
-      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -121,9 +135,8 @@ function SignedOutPanel({
           autoComplete="email"
           required
         />
-        <Field
+        <PasswordField
           label="Password"
-          type="password"
           value={password}
           onChange={setPassword}
           autoComplete={view === "signin" ? "current-password" : "new-password"}
@@ -142,6 +155,12 @@ function SignedOutPanel({
         {error && (
           <p className="text-[11px] uppercase tracking-[0.22em] text-champagne">
             {error}
+          </p>
+        )}
+
+        {notice && !error && (
+          <p className="text-[11px] uppercase tracking-[0.22em] text-chalk/80">
+            {notice}
           </p>
         )}
 
@@ -197,6 +216,7 @@ function SignedInPanel({
   onClose: () => void;
 }) {
   const greeting = user.name || user.email.split("@")[0];
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-chalk/10 px-6 py-8 md:px-8">
@@ -259,12 +279,25 @@ function SignedInPanel({
       <div className="border-t border-chalk/10 px-6 py-6 md:px-8">
         <button
           type="button"
-          onClick={onSignOut}
+          onClick={() => setConfirmingSignOut(true)}
           className="w-full border border-chalk/40 py-4 text-[11px] font-semibold uppercase tracking-[0.28em] text-chalk transition-colors hover:border-chalk hover:bg-chalk hover:text-ink"
         >
           Sign Out
         </button>
       </div>
+
+      <ConfirmDialog
+        open={confirmingSignOut}
+        title="Sign out"
+        message="Are you sure you want to sign out?"
+        confirmLabel="Sign Out"
+        cancelLabel="Cancel"
+        onCancel={() => setConfirmingSignOut(false)}
+        onConfirm={() => {
+          setConfirmingSignOut(false);
+          onSignOut();
+        }}
+      />
     </div>
   );
 }
@@ -358,5 +391,92 @@ function Field({
         className="w-full border-b border-chalk/25 bg-transparent py-2 text-[14px] text-chalk placeholder:text-chalk/40 transition-colors focus:border-chalk focus:outline-none"
       />
     </label>
+  );
+}
+
+// Password input with a show/hide toggle. Keeps the Field styling and
+// swaps the <input type> between "password" and "text" based on the
+// visibility state, so autofill, autocomplete, and password managers
+// still behave normally.
+function PasswordField({
+  label,
+  value,
+  onChange,
+  autoComplete,
+  required
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  autoComplete?: string;
+  required?: boolean;
+}) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <label className="block">
+      <span className="mb-2 block text-[10px] uppercase tracking-[0.32em] text-chalk/55">
+        {label}
+        {required && <span className="ml-1 text-chalk/40">*</span>}
+      </span>
+      <div className="relative">
+        <input
+          type={visible ? "text" : "password"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          autoComplete={autoComplete}
+          required={required}
+          className="w-full border-b border-chalk/25 bg-transparent py-2 pr-10 text-[14px] text-chalk placeholder:text-chalk/40 transition-colors focus:border-chalk focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={() => setVisible((v) => !v)}
+          aria-label={visible ? "Hide password" : "Show password"}
+          aria-pressed={visible}
+          className="absolute inset-y-0 right-0 flex items-center px-2 text-chalk/55 transition-colors hover:text-chalk"
+        >
+          {visible ? <EyeOffIcon /> : <EyeIcon />}
+        </button>
+      </div>
+    </label>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M1.5 10S4.5 4 10 4s8.5 6 8.5 6-3 6-8.5 6S1.5 10 1.5 10Z" />
+      <circle cx="10" cy="10" r="2.5" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 3l14 14" />
+      <path d="M8.2 5.1A9 9 0 0 1 10 5c5.5 0 8.5 5 8.5 5a14.5 14.5 0 0 1-2.6 3.2" />
+      <path d="M6.1 6.6C3.5 8.1 1.5 10 1.5 10S4.5 15 10 15c1.3 0 2.4-.3 3.4-.7" />
+      <path d="M8.4 8.4a2.5 2.5 0 0 0 3.3 3.3" />
+    </svg>
   );
 }

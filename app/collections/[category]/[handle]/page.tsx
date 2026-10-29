@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { categorySlug, productRef } from "@/lib/content";
+import { nameSlug, productRef } from "@/lib/content";
 // `getRelatedProducts` was the hardcoded-catalog fallback; replaced by
 // `fetchRelatedProducts` which queries the backend for same-category pieces.
 // import { getRelatedProducts } from "@/lib/content";
-import { fetchProduct, fetchRelatedProducts } from "@/lib/products-api";
+import { fetchProducts, fetchRelatedProducts } from "@/lib/products-api";
 import { ProductHero } from "@/components/product/product-hero";
 import { ProductStickyBar } from "@/components/product/product-sticky-bar";
 import { ProductInfo } from "@/components/product/product-info";
@@ -32,8 +32,16 @@ type Params = { category: string; handle: string };
 // and adding a nested generator triggers a known Next 14 dev-mode webpack
 // hiccup when descendant client components pull in framer-motion.
 
+// URL slugs are the product's slugified name (not the backend handle). We
+// look up by category, then match on `nameSlug(name) === params.handle` so
+// the admin's opaque `lv-721518` handle never has to appear in the URL.
+async function findProductByNameSlug(categorySlugValue: string, nameSlugValue: string) {
+  const products = await fetchProducts({ category: categorySlugValue });
+  return products.find((p) => nameSlug(p.name) === nameSlugValue) ?? null;
+}
+
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
-  const product = await fetchProduct(params.handle);
+  const product = await findProductByNameSlug(params.category, params.handle);
   if (!product) return { title: "Not found — The Luxe Version" };
   return {
     title: `${product.name} — The Luxe Version`,
@@ -42,12 +50,8 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 }
 
 export default async function ProductDetailPage({ params }: { params: Params }) {
-  const product = await fetchProduct(params.handle);
-  // Guard against slug mismatch (e.g., product moved category) — 404 rather
-  // than silently rendering under the wrong category URL.
-  if (!product || categorySlug(product.category) !== params.category) {
-    notFound();
-  }
+  const product = await findProductByNameSlug(params.category, params.handle);
+  if (!product) notFound();
 
   // Related pieces for the "Discover Also" rail — backend query for other
   // products in the same category, excluding the current piece, capped at 3.

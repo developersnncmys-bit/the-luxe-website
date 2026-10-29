@@ -6,14 +6,42 @@ import { useRef } from "react";
 import { JOURNAL_ENTRIES } from "@/lib/content";
 import { SafeImage } from "@/components/ui/safe-image";
 
-type Entry = (typeof JOURNAL_ENTRIES)[number];
+// Shape used by the strip — matches both the hardcoded JOURNAL_ENTRIES
+// above and admin-authored Journal rows passed in from app/page.tsx.
+// `href` is the destination for the card click (we land on the Studio page
+// and anchor to the matching piece).
+export type JournalTeaserItem = {
+  id: string;
+  title: string;
+  image: string;
+  href: string;
+};
 
-export function JournalTeaser() {
+export type JournalTeaserProps = {
+  entries?: JournalTeaserItem[];
+};
+
+export function JournalTeaser({ entries }: JournalTeaserProps = {}) {
   const stripRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: stripRef,
     offset: ["start end", "end start"]
   });
+
+  // Backend entries win when passed and non-empty; otherwise fall back to
+  // the hardcoded JOURNAL_ENTRIES slice so the strip never renders empty
+  // during local dev or before the admin has authored anything.
+  const resolvedEntries: JournalTeaserItem[] =
+    entries && entries.length > 0
+      ? entries
+      : JOURNAL_ENTRIES.slice(0, 4).map((e) => ({
+          id: e.slug,
+          title: e.title,
+          image: e.image,
+          // Hardcoded fallback entries don't have individual pages; link to
+          // the Studio page itself.
+          href: "/journal"
+        }));
 
   return (
     <section
@@ -51,9 +79,9 @@ export function JournalTeaser() {
         ref={stripRef}
         className="mx-auto grid max-w-editorial grid-cols-1 gap-6 px-6 md:grid-cols-4 md:gap-8 md:px-10"
       >
-        {JOURNAL_ENTRIES.slice(0, 4).map((entry, i) => (
+        {resolvedEntries.slice(0, 4).map((entry, i) => (
           <JournalCard
-            key={entry.slug}
+            key={entry.id}
             entry={entry}
             index={i}
             scrollYProgress={scrollYProgress}
@@ -83,7 +111,7 @@ function JournalCard({
   index,
   scrollYProgress
 }: {
-  entry: Entry;
+  entry: JournalTeaserItem;
   index: number;
   scrollYProgress: MotionValue<number>;
 }) {
@@ -105,16 +133,19 @@ function JournalCard({
         ease: [0.22, 1, 0.36, 1]
       }}
     >
-      <Link
-        href={`/journal/${entry.slug}`}
-        className="group relative block h-[70svh] w-full overflow-hidden bg-onyx md:h-[85svh]"
+      {/* Cards are intentionally non-clickable. Previously wrapped in a
+          Link to entry.href; removed on request. The `group` class is kept
+          so the hover scale + underline animations still work on cursor
+          enter even without the navigation. */}
+      <div
+        className="group relative block aspect-square w-full overflow-hidden bg-onyx"
       >
         {/* Parallax image (extends past container so translate doesn't reveal empty edges) */}
         <motion.div style={{ y }} className="absolute -inset-y-[8%] inset-x-0">
           <SafeImage
             src={entry.image}
             alt={entry.title}
-            fallbackSeed={entry.slug}
+            fallbackSeed={entry.id}
             fill
             sizes="(min-width: 768px) 25vw, 100vw"
             quality={68}
@@ -140,7 +171,7 @@ function JournalCard({
             className="block h-px w-10 bg-chalk/70 transition-[width,background-color] duration-[600ms] ease-silk group-hover:w-20 group-hover:bg-chalk"
           />
         </div>
-      </Link>
+      </div>
     </motion.article>
   );
 }

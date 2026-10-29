@@ -13,9 +13,25 @@ import { SafeImage } from "@/components/ui/safe-image";
 import { PRODUCTS, type Product } from "@/lib/content";
 
 // A tile in either slot can now be a video OR an image — the discriminant is `kind`.
-type MediaTile =
-  | { kind: "video"; src: string; poster: string; label: string; kicker: string }
-  | { kind: "image"; src: string; alt: string; label: string; kicker: string };
+// `caption` is an optional admin override consumed by HeroPlusInset below:
+// renders a line of supporting copy under the label.
+export type MediaTile =
+  | {
+      kind: "video";
+      src: string;
+      poster: string;
+      label: string;
+      kicker: string;
+      caption?: string;
+    }
+  | {
+      kind: "image";
+      src: string;
+      alt: string;
+      label: string;
+      kicker: string;
+      caption?: string;
+    };
 
 // Category order for the beats — matches the home Collection section so both
 // grids walk the house in the same rhythm.
@@ -53,7 +69,7 @@ const INSET_IMAGE_OVERRIDE: Partial<Record<Product["category"], string>> = {
   Vases: "/images/sculptures/Altesse/Altesse-home.png"
 };
 
-type Beat = { hero: MediaTile; inset: MediaTile };
+export type Beat = { hero: MediaTile; inset: MediaTile };
 
 const BEATS: Beat[] = CATEGORY_ORDER
   .map((cat) => {
@@ -89,7 +105,14 @@ const BEATS: Beat[] = CATEGORY_ORDER
     }
   }));
 
-export function ChapterObject() {
+// `beats` — optional backend override. When passed and non-empty, replaces
+// the hardcoded BEATS list above. The home page server component builds
+// this from the InSitu + Products collections.
+export type ChapterObjectProps = {
+  beats?: Beat[];
+};
+
+export function ChapterObject({ beats }: ChapterObjectProps = {}) {
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
@@ -99,6 +122,11 @@ export function ChapterObject() {
   // Shared parallax offsets — same subtle drift for every beat's hero and inset.
   const yHero = useTransform(scrollYProgress, [0, 1], ["-4%", "6%"]);
   const yInset = useTransform(scrollYProgress, [0, 1], ["-10%", "6%"]);
+
+  // Backend-authored beats win; otherwise use the hardcoded BEATS. Empty
+  // backend arrays also fall through to the hardcoded set — avoids a blank
+  // chapter if the admin hasn't seeded any in-situ rows yet.
+  const resolvedBeats = beats && beats.length > 0 ? beats : BEATS;
 
   return (
     <section
@@ -133,7 +161,7 @@ export function ChapterObject() {
 
         {/* One beat per category — alternating mirror for editorial rhythm.
             Spacing between beats matches the previous 40/64 gap. */}
-        {BEATS.map((beat, i) => (
+        {resolvedBeats.map((beat, i) => (
           <div key={beat.hero.label} className={i === 0 ? "" : "mt-40 md:mt-64"}>
             <HeroPlusInset
               hero={beat.hero}
@@ -187,7 +215,8 @@ function HeroPlusInset({
           <MediaCell tile={hero} sizes="(min-width: 768px) 60vw, 100vw" />
         </motion.div>
 
-        {/* Hero caption — stacked kicker + bold label, matching the inset caption style. */}
+        {/* Hero caption — stacked kicker + bold label, with an optional
+            admin-authored sub-caption below. */}
         <div
           className={clsx(
             "mt-4",
@@ -200,6 +229,11 @@ function HeroPlusInset({
           <h3 className="mt-2 font-display text-[14px] font-bold uppercase leading-[1.15] tracking-[0.01em] md:text-[16px]">
             {hero.label}
           </h3>
+          {hero.caption && (
+            <p className="mt-3 max-w-md text-[12px] leading-[1.6] text-chalk/70 md:text-[13px]">
+              {hero.caption}
+            </p>
+          )}
         </div>
       </div>
 

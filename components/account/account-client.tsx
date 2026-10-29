@@ -9,6 +9,7 @@ import {
   type Order,
   type Preferences
 } from "@/components/store/store-provider";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 // The whole /account page. Sections stack vertically; the sidebar nav (or
 // drawer menu items) jump-scrolls to each via #anchor.
@@ -27,6 +28,8 @@ export function AccountClient() {
     orders,
     cancelOrder
   } = useStore();
+
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false);
 
   // Scroll to hash after mount (Next doesn't auto-scroll to hash on same-page
   // navigations reliably when the target is inside a client component that
@@ -77,7 +80,7 @@ export function AccountClient() {
             ))}
             <button
               type="button"
-              onClick={signOut}
+              onClick={() => setConfirmingSignOut(true)}
               className="mt-6 block py-2 text-[11px] uppercase tracking-[0.24em] text-chalk/70 underline underline-offset-[6px] decoration-chalk/30 transition-colors hover:text-chalk hover:decoration-chalk/70"
             >
               Sign Out
@@ -104,6 +107,19 @@ export function AccountClient() {
           />
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmingSignOut}
+        title="Sign out"
+        message="Are you sure you want to sign out?"
+        confirmLabel="Sign Out"
+        cancelLabel="Cancel"
+        onCancel={() => setConfirmingSignOut(false)}
+        onConfirm={() => {
+          setConfirmingSignOut(false);
+          signOut();
+        }}
+      />
     </div>
   );
 }

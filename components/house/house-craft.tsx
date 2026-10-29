@@ -3,7 +3,41 @@
 import Image from "next/image";
 import { motion } from "framer-motion";
 
-export function HouseCraft() {
+// Shape used for the numbered principles list — matches both the hardcoded
+// PRINCIPLES below and admin-authored CraftPrinciple rows.
+export type HouseCraftPrincipleItem = {
+  title: string;
+  body: string;
+};
+
+export type HouseCraftProps = {
+  headline?: string;              // overrides "Craft"
+  lead?: string;                  // overrides the italic lead paragraph on the left
+  image?: string;                 // overrides the right-column product shot
+  imageAttribution?: string;      // overrides the small caption under the image
+  principles?: HouseCraftPrincipleItem[]; // admin-authored list; falls back to hardcoded
+};
+
+const DEFAULT_HEADLINE = "Craft";
+const DEFAULT_LEAD =
+  "Each piece is made by a hand we know, from a workshop we've walked into.";
+const DEFAULT_IMAGE = "/images/sculptures/scu4.png";
+const DEFAULT_IMAGE_ATTRIBUTION = "Lume Alba · Brass, hand-turned";
+
+export function HouseCraft({
+  headline,
+  lead,
+  image,
+  imageAttribution,
+  principles
+}: HouseCraftProps = {}) {
+  const resolvedHeadline = headline || DEFAULT_HEADLINE;
+  const resolvedLead = lead || DEFAULT_LEAD;
+  const resolvedImage = image || DEFAULT_IMAGE;
+  const resolvedAttribution = imageAttribution || DEFAULT_IMAGE_ATTRIBUTION;
+  const resolvedPrinciples =
+    principles && principles.length > 0 ? principles : PRINCIPLES;
+
   return (
     <section
       data-nav-invert
@@ -21,7 +55,7 @@ export function HouseCraft() {
             transition={{ duration: 1.1, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
             className="font-display text-display-md font-semibold uppercase leading-[1.02] tracking-[0.06em]"
           >
-            Craft
+            {resolvedHeadline}
           </motion.h2>
         </div>
 
@@ -35,11 +69,11 @@ export function HouseCraft() {
               transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
               className="font-display text-[clamp(1.25rem,2vw,1.75rem)] font-light leading-[1.5] text-ink/90"
             >
-              Each piece is made by a hand we know, from a workshop we've walked into.
+              {resolvedLead}
             </motion.p>
 
             <div className="mt-14 flex flex-col divide-y divide-ink/15 border-t border-b border-ink/15">
-              {PRINCIPLES.map((p, i) => (
+              {resolvedPrinciples.map((p, i) => (
                 <motion.div
                   key={p.title}
                   initial={{ opacity: 0, y: 18 }}
@@ -73,15 +107,15 @@ export function HouseCraft() {
               className="relative aspect-[4/5] w-full overflow-hidden bg-onyx"
             >
               <Image
-                src="/images/sculptures/scu4.png"
-                alt="A brass table lamp on the studio floor — the hand of the maker still on it"
+                src={resolvedImage}
+                alt={resolvedAttribution || "Craft — a hand-finished piece from the studio"}
                 fill
                 sizes="(min-width: 768px) 40vw, 100vw"
                 className="object-cover"
               />
             </motion.div>
             <p className="mt-6 text-[10px] uppercase tracking-[0.32em] text-ink/40">
-              Lume Alba · Brass, hand-turned
+              {resolvedAttribution}
             </p>
           </div>
         </div>

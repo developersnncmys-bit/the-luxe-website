@@ -3,7 +3,32 @@
 import { motion } from "framer-motion";
 import { SafeImage } from "@/components/ui/safe-image";
 
-export function HouseMaterials() {
+// Shape used by the grid — matches both the hardcoded MATERIALS list below
+// and admin-authored Material rows (which carry { name, description, image }).
+export type HouseMaterialItem = {
+  name: string;
+  image?: string;
+  body: string;
+};
+
+export type HouseMaterialsProps = {
+  headline?: string;      // admin override for the big centered heading
+  lead?: string;          // admin override for the centered intro paragraph
+  items?: HouseMaterialItem[]; // admin-authored list; falls back to hardcoded
+};
+
+const DEFAULT_HEADLINE = "Materials";
+const DEFAULT_LEAD =
+  "Five families of matter. We work in these because they age with the room instead of against it — because the light finds them differently at every hour.";
+
+export function HouseMaterials({ headline, lead, items }: HouseMaterialsProps = {}) {
+  const resolvedHeadline = headline || DEFAULT_HEADLINE;
+  const resolvedLead = lead || DEFAULT_LEAD;
+  // Backend wins when items array is non-empty; otherwise the hardcoded
+  // MATERIALS list keeps the section populated (and the storefront usable
+  // when no admin content has been seeded yet).
+  const resolvedItems = items && items.length > 0 ? items : MATERIALS;
+
   return (
     <section
       className="relative bg-ink py-32 text-chalk md:py-44"
@@ -21,7 +46,7 @@ export function HouseMaterials() {
             transition={{ duration: 1.1, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
             className="font-display text-display-md font-semibold uppercase leading-[1.02] tracking-[0.06em]"
           >
-            Materials
+            {resolvedHeadline}
           </motion.h2>
 
           <motion.p
@@ -31,8 +56,7 @@ export function HouseMaterials() {
             transition={{ duration: 1.2, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
             className="mt-8 text-[13px] leading-[1.85] text-chalk/75 md:text-[14px]"
           >
-            Five families of matter. We work in these because they age with the room
-            instead of against it — because the light finds them differently at every hour.
+            {resolvedLead}
           </motion.p>
         </div>
 
@@ -40,7 +64,7 @@ export function HouseMaterials() {
             5-across on desktop for the "material sample wall" feel; collapses
             on smaller screens. */}
         <ul className="mx-auto mt-24 grid grid-cols-2 gap-x-6 gap-y-14 md:mt-32 md:grid-cols-3 md:gap-x-8 md:gap-y-20 lg:grid-cols-5 lg:gap-x-10">
-          {MATERIALS.map((m, i) => (
+          {resolvedItems.map((m, i) => (
             <motion.li
               key={m.name}
               initial={{ opacity: 0, y: 20 }}
@@ -51,7 +75,7 @@ export function HouseMaterials() {
             >
               <div className="relative aspect-square w-full overflow-hidden bg-onyx">
                 <SafeImage
-                  src={m.image}
+                  src={m.image ?? ""}
                   alt={`${m.name} — material sample`}
                   fallbackSeed={`material-${m.name.toLowerCase()}`}
                   fill

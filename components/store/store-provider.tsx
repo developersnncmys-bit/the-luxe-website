@@ -10,8 +10,9 @@ import {
   useState,
   type ReactNode
 } from "react";
-import { PRODUCTS, type Product } from "@/lib/content";
+import { EXCLUSIVE_PIECES, PRODUCTS, type ExclusivePiece, type Product } from "@/lib/content";
 import { apiFetch, clearToken, getToken, setToken } from "@/lib/api";
+import { fetchExclusivePieces } from "@/lib/exclusive-api";
 
 export type DrawerKind = "cart" | "wishlist" | "search" | "account" | null;
 
@@ -163,6 +164,27 @@ function safeParse<T>(raw: string | null, fallback: T): T {
   }
 }
 
+// Luxe Exclusive pieces aren't in the PRODUCTS catalog — they're their
+// own `EXCLUSIVE_PIECES` list in content.ts. When one is added to the
+// cart, the drawer/checkout code expects a Product shape to render it,
+// so we adapt on the fly. USD rate matches the rough conversion used
+// elsewhere in the storefront (lib/products-api.ts); good enough for
+// display, not for billing.
+const INR_PER_USD = 83;
+function exclusivePieceToProduct(piece: ExclusivePiece): Product {
+  const inr = piece.price ?? 0;
+  return {
+    handle: piece.slug,
+    name: piece.name,
+    category: "Luxe Exclusive",
+    description: piece.intro,
+    price: { inr, usd: Math.round(inr / INR_PER_USD) },
+    image: piece.image,
+    aspect: "portrait",
+    material: piece.material
+  };
+}
+
 // ---------- Backend payload shapes ----------
 
 type BackendAddress = {
@@ -270,6 +292,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [drawer, setDrawer] = useState<DrawerKind>(null);
   const [hydrated, setHydrated] = useState(false);
+  // Luxe Exclusive pieces available to productByHandle. Seeded with the
+  // hardcoded list so the cart can resolve a handle before the backend
+  // round-trip completes; swapped for the admin's list once fetched. If
+  // the backend is unreachable, the hardcoded seed stays — nothing to
+  // overwrite with — so the resolver never regresses.
+  const [exclusivePieces, setExclusivePieces] =
+    useState<ExclusivePiece[]>(EXCLUSIVE_PIECES);
 
   // Latest token lives in a ref so async callbacks always see the current
   // value without re-triggering effects.
@@ -296,6 +325,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     tokenRef.current = getToken();
     setHydrated(true);
+  }, []);
+
+  // Pull the admin-managed Luxe Exclusive list so productByHandle can
+  // resolve cart items whose slugs were authored in the backend (not in
+  // the hardcoded seed). Silent failure: the hardcoded seed stays if the
+  // backend is unreachable; errors print to the console so backend
+  // problems are visible during integration.
+  useEffect(() => {
+    let cancelled = false;
+    fetchExclusivePieces()
+      .then((rows) => {
+        if (cancelled || rows.length === 0) return;
+        setExclusivePieces(rows);
+      })
+      .catch((err) =>
+        console.error("[store-provider] failed to fetch exclusive pieces:", err)
+      );
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // When hydrated and a token is present, refresh the signed-in view from
@@ -457,9 +506,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Resolve a cart handle to a Product. Checks the hardcoded PRODUCTS
+  // catalog first, then falls back to Luxe Exclusive pieces (keyed by
+  // slug) so the featured hero's "Add to Bag" button yields a cart row
+  // the drawer and checkout can render just like any other product.
+  // `exclusivePieces` is admin-authored and populated from the backend
+  // (seeded with the hardcoded list so lookups work before the fetch).
   const productByHandle = useCallback(
-    (handle: string) => PRODUCTS.find((p) => p.handle === handle),
-    []
+    (handle: string) => {
+      const direct = PRODUCTS.find((p) => p.handle === handle);
+      if (direct) return direct;
+      const piece = exclusivePieces.find((p) => p.slug === handle);
+      return piece ? exclusivePieceToProduct(piece) : undefined;
+    },
+    [exclusivePieces]
   );
 
   // Auth. The storefront version takes a real password now; the backend
@@ -678,13 +738,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [cart]
   );
 
+  // Subtotal flows through productByHandle so Luxe Exclusive pieces (which
+  // live outside PRODUCTS and come from the admin-managed list) contribute
+  // their price too. A naive PRODUCTS.find lookup silently zeroed them out.
   const cartSubtotal = useMemo(
     () =>
       cart.reduce((acc, i) => {
-        const p = PRODUCTS.find((x) => x.handle === i.handle);
+        const p = productByHandle(i.handle);
         return acc + (p?.price.inr ?? 0) * i.qty;
       }, 0),
-    [cart]
+    [cart, productByHandle]
   );
 
   const value: StoreState = {

@@ -7,13 +7,18 @@ import { AnimatePresence, motion } from "framer-motion";
 import { SafeImage } from "@/components/ui/safe-image";
 import { productHref, type Product } from "@/lib/content";
 import {
+  categoryLabelFromSlug,
+  type Category
+} from "@/lib/categories-api";
+import {
   FilterDrawer,
   FilterIcon,
   applyProductFilters,
   getAvailableMaterials
 } from "@/components/collections/filters/product-filters";
 
-type FilterId = "all" | "sculptures" | "vases" | "tabletop";
+// "all" is a fixed bookend. Every other chip id is a backend category slug.
+type FilterId = string;
 
 type Chip = {
   id: FilterId;
@@ -21,14 +26,39 @@ type Chip = {
   match?: Product["category"]; // omitted for "all"
 };
 
-const CHIPS: Chip[] = [
-  { id: "all", label: "All Objects" },
-  { id: "sculptures", label: "Sculptures", match: "Sculptures" },
-  { id: "vases", label: "Vases", match: "Vases" },
-  { id: "tabletop", label: "Tabletop", match: "Tabletop" }
-];
+// Reserved slug the admin can create to override the "All Objects" chip —
+// their category name becomes the chip label and their category image
+// becomes the chip thumbnail. The chip is always rendered; deleting the
+// backend category just reverts to the hardcoded defaults, so the "show
+// all" entry can never be removed by accident.
+const ALL_OBJECTS_OVERRIDE_SLUG = "all-objects";
 
-export function ObjectsCatalog({ products }: { products: Product[] }) {
+export function ObjectsCatalog({
+  products,
+  categories
+}: {
+  products: Product[];
+  categories: Category[];
+}) {
+  // Build the chip list from backend categories. `match` compares against the
+  // product's title-cased category label (which is itself derived from the
+  // slug in products-api.adaptBackendProduct), so chip filtering survives
+  // admin renames of the display `name`.
+  const CHIPS: Chip[] = useMemo(() => {
+    const allOverride = categories.find(
+      (c) => c.id === ALL_OBJECTS_OVERRIDE_SLUG
+    );
+    const rest = categories.filter((c) => c.id !== ALL_OBJECTS_OVERRIDE_SLUG);
+    return [
+      { id: "all", label: allOverride?.name || "All Objects" },
+      ...rest.map((c) => ({
+        id: c.id,
+        label: c.name || categoryLabelFromSlug(c.id),
+        match: categoryLabelFromSlug(c.id)
+      }))
+    ];
+  }, [categories]);
+
   const [active, setActive] = useState<FilterId>("all");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedMaterials, setSelectedMaterials] = useState<Set<string>>(
@@ -43,7 +73,7 @@ export function ObjectsCatalog({ products }: { products: Product[] }) {
     if (active === "all") return products;
     const match = CHIPS.find((c) => c.id === active)?.match;
     return match ? products.filter((p) => p.category === match) : products;
-  }, [active, products]);
+  }, [active, products, CHIPS]);
 
   // 2. Available materials adapt to the current chip selection — only surface
   //    material keywords that at least one currently-visible product has.
@@ -83,11 +113,14 @@ export function ObjectsCatalog({ products }: { products: Product[] }) {
   // product overall for the "all" chip. Purely visual — clickability lives
   // on the surrounding button.
   const chipImages = useMemo(() => {
+    const allOverride = categories.find(
+      (c) => c.id === ALL_OBJECTS_OVERRIDE_SLUG
+    );
     const map = new Map<FilterId, { src: string; seed: string }>();
     CHIPS.forEach((c) => {
       if (c.id === "all") {
         map.set(c.id, {
-          src: products[0]?.image ?? "",
+          src: allOverride?.image || products[0]?.image || "",
           seed: "chip-all"
         });
       } else {
@@ -99,7 +132,7 @@ export function ObjectsCatalog({ products }: { products: Product[] }) {
       }
     });
     return map;
-  }, [products]);
+  }, [products, CHIPS, categories]);
 
   return (
     <>

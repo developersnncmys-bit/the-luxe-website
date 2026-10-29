@@ -20,18 +20,24 @@ export type HouseHeroProps = {
   imageAlt?: string;
   ctaLabel?: string;
   ctaHref?: string;
+  // Small all-caps caption rendered in the bottom-left (e.g.
+  // "OBJET · SILLON — CAST BRONZE"). Comes from the banner's attribution
+  // field in the admin.
+  attribution?: string;
 };
 
 export function HouseHero({
   image,
   imageAlt,
   ctaLabel,
-  ctaHref
+  ctaHref,
+  attribution
 }: HouseHeroProps = {}) {
   const resolvedImage = image || "";
   const resolvedImageAlt = imageAlt || "";
   const resolvedCtaLabel = ctaLabel || "";
   const resolvedCtaHref = ctaHref || "";
+  const resolvedAttribution = attribution || "";
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
@@ -105,6 +111,17 @@ export function HouseHero({
           {resolvedCtaLabel}
         </Link>
       </motion.div>
+
+      {/* Attribution — small bottom-left caption. Rendered only when the
+          admin's banner has one, so the hero stays clean otherwise. */}
+      {resolvedAttribution && (
+        <motion.p
+          style={{ opacity }}
+          className="absolute bottom-10 left-6 z-10 text-[10px] uppercase tracking-[0.28em] text-chalk/70 md:bottom-14 md:left-14"
+        >
+          {resolvedAttribution}
+        </motion.p>
+      )}
     </section>
   );
 }

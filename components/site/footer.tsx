@@ -3,27 +3,26 @@
 import Link from "next/link";
 import { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { IconGlobe, IconChevron } from "@/components/ui/icons";
 
 const COLUMNS = [
   {
     title: "Explore The House",
     links: [
-      { href: "/collections/showpieces", label: "Showpieces" },
-      { href: "/collections/lighting", label: "Lighting" },
-      { href: "/collections/mirrors", label: "Mirrors" },
+      { href: "/collections/sculptures", label: "Sculptures" },
+      { href: "/collections/vases", label: "Vases" },
       { href: "/collections", label: "The Complete Collection" }
     ]
   },
   {
     title: "Online Services",
     links: [
-      { href: "/payment", label: "Payment Methods" },
-      { href: "/shipping", label: "Shipping Options" },
+      { href: "/payment", label: "Payment Policy" },
+      { href: "/shipping", label: "Shipping Policy" },
       { href: "/account", label: "My Account" },
-      { href: "/returns", label: "Returns" },
+      { href: "/returns", label: "Return, Refund & Replacement Policy" },
+      { href: "/cancellation", label: "Cancellation Policy" },
       { href: "/care", label: "Care & Restoration" },
-      { href: "/faq", label: "FAQ" }
+      { href: "/faq", label: "FAQ's" }
     ]
   },
   {
@@ -31,7 +30,8 @@ const COLUMNS = [
     links: [
       { href: "/studio/appointment", label: "Book an appointment" },
       { href: "/studio/bespoke", label: "Bespoke commissions" },
-      { href: "/studio/interior", label: "Interior consultation" }
+      { href: "/studio/interior", label: "Interior consultation" },
+      { href: "/contact", label: "Contact" }
     ]
   },
   {
@@ -40,8 +40,7 @@ const COLUMNS = [
       { href: "/house", label: "The House" },
       { href: "/journal", label: "The Studio" },
       { href: "/careers", label: "Careers" },
-      // { href: "/press", label: "Press" },
-      { href: "/legal", label: "Legal Statement" },
+      { href: "/terms", label: "Terms & Conditions" },
       { href: "/privacy", label: "Privacy Policy" }
     ]
   }
@@ -142,9 +141,17 @@ export function Footer() {
               <p className="mb-4 text-[13px] leading-[1.8] text-ink/75">
                 Subscribe to receive the latest dispatches from The Luxe Version.
               </p>
-              <Link href="/newsletter" className="cta-outline cta-outline--dark text-ink">
-                Subscribe
-              </Link>
+              <form className="flex items-center gap-3 border-b border-ink/30 pb-2">
+                <input
+                  type="email"
+                  placeholder="Your email address"
+                  aria-label="Email address"
+                  className="w-full bg-transparent text-[13px] placeholder:text-ink/40 focus:outline-none"
+                />
+                <button type="submit" className="text-[10px] uppercase tracking-[0.22em] text-ink/70 hover:text-ink">
+                  Subscribe
+                </button>
+              </form>
             </motion.div>
           </div>
       </motion.section>
@@ -182,7 +189,7 @@ export function Footer() {
             </ul>
           </div>
 
-          <div className="grid grid-cols-2 gap-10 md:grid-cols-4 md:gap-6">
+          <div className="grid grid-cols-2 gap-10 md:grid-cols-4 md:gap-8">
             {COLUMNS.map((col) => (
               <div key={col.title}>
                 <p className="mb-5 text-[11px] font-bold uppercase tracking-[0.22em]">
@@ -205,28 +212,13 @@ export function Footer() {
         {/* Region + legal */}
         <div className="mx-auto max-w-editorial px-6 pb-14 md:px-10">
           <div className="mt-12 flex flex-col-reverse gap-4 border-t border-chalk/15 pt-8 md:mt-8 md:flex-row md:items-center md:justify-between">
-            <p className="text-[11px] text-chalk/50">
+            <p className="text-[13px] text-chalk/55">
               The Luxe Version Private Limited, 5th Floor, Unit N° 505, UB City,
               24 Vittal Mallya Road, Bengaluru 560001, India.
             </p>
-            {/*
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 self-start text-[11px] uppercase tracking-[0.22em] text-chalk/70 hover:text-chalk md:self-auto"
-            >
-              <IconGlobe />
-              Change location & language: India — English
-              <IconChevron />
-            </button>
-            */}
-            <a
-              href="https://nakshatranamahacreations.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="cursor-pointer self-start text-[11px] uppercase tracking-[0.22em] text-chalk/70 underline-offset-4 transition-colors hover:text-chalk hover:underline md:self-auto"
-            >
-              Developed by Nakshatranamaha Creations
-            </a>
+            <p className="self-start text-[13px] uppercase tracking-[0.22em] text-chalk/70 md:self-auto">
+              © {new Date().getFullYear()} The Luxe Version. All Rights Reserved.
+            </p>
           </div>
         </div>
       </div>

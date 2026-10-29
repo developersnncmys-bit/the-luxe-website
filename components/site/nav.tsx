@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
 import { IconSearch, IconAccount, IconHeart, IconBag } from "@/components/ui/icons";
 import { useStore } from "@/components/store/store-provider";
 import { HighContrastToggle } from "@/components/site/high-contrast-toggle";
+import { fetchCategories, type Category } from "@/lib/categories-api";
 
 const PRIMARY_LINKS: Array<{ href: string; label: string; tag?: string }> = [
   { href: "/", label: "Home" },
@@ -17,15 +18,14 @@ const PRIMARY_LINKS: Array<{ href: string; label: string; tag?: string }> = [
   { href: "/journal", label: "The Studio" }
 ];
 
-// Sits inside the floating dark panel below the wordmark — sub-taxonomy of Objects + Lighting
-const COLLECTION_SUBLINKS = [
-  { href: "/collections/objects", label: "All Objects" },
-  { href: "/collections/sculptures", label: "Sculptures" },
-  { href: "/collections/vases", label: "Vases" },
-  { href: "/collections/tabletop", label: "Tabletop" },
-  { href: "/collections/lighting", label: "Lighting" },
-  { href: "/exclusive", label: "Luxe Exclusive" }
-];
+// "Luxe Exclusive" sits as a fixed tail bookend — it's a dedicated page,
+// not a backend category. "All Objects" is admin-managed via the reserved
+// `all-objects` slug in the Categories tab (so its label and position are
+// controlled like any other category); the storefront routes that slug to
+// the existing /collections/objects page instead of a slug-matched page.
+const COLLECTION_BOOKEND_TAIL = { href: "/exclusive", label: "Luxe Exclusive" };
+const ALL_OBJECTS_SLUG = "all-objects";
+const ALL_OBJECTS_HREF = "/collections/objects";
 
 // Sits inside a floating dark panel that drops below the navbar on hover
 const DROPDOWN_LINKS = [
@@ -49,7 +49,41 @@ export function Nav() {
   const [footerRevealed, setFooterRevealed] = useState(false);
   const [navHovered, setNavHovered] = useState(false);
   const [overLight, setOverLight] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
   const pathname = usePathname();
+
+  // Pull the admin-managed category list once on mount. Nav is persistent
+  // across client-side navigations, so this runs a single time per full
+  // page load. On failure we silently fall back to the two fixed bookends,
+  // which still gets the visitor into the catalog via "All Objects".
+  useEffect(() => {
+    let cancelled = false;
+    fetchCategories()
+      .then((rows) => {
+        if (!cancelled) setCategories(rows);
+      })
+      .catch(() => {
+        /* leave the sublinks row with just the fixed bookends */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // <admin categories, order-sorted, active-only> + "Luxe Exclusive".
+  // The reserved `all-objects` slug behaves like any other category in the
+  // nav (admin-authored label and order), but its href routes to the
+  // existing /collections/objects page rather than a slug-matched route.
+  const collectionSublinks = useMemo(() => {
+    const dynamic = [...categories]
+      .filter((c) => c.active !== false)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      .map((c) => ({
+        href: c.id === ALL_OBJECTS_SLUG ? ALL_OBJECTS_HREF : `/collections/${c.id}`,
+        label: c.name
+      }));
+    return [...dynamic, COLLECTION_BOOKEND_TAIL];
+  }, [categories]);
   const { openDrawer, cartCount, wishlist, user } = useStore();
   const wishlistCount = wishlist.length;
   const isSignedIn = !!user;
@@ -352,7 +386,7 @@ export function Nav() {
           {!menuOpen && (
             <nav aria-label="Collections" className="hidden md:block">
               <ul className="mx-auto flex max-w-editorial items-center justify-center gap-10 px-10 py-3 lg:gap-14">
-                {(isCheckoutPage || navHovered || pathname.startsWith("/collections/") || pathname.startsWith("/exclusive") ? COLLECTION_SUBLINKS : DROPDOWN_LINKS).map((l) => {
+                {(isCheckoutPage || navHovered || pathname.startsWith("/collections/") || pathname.startsWith("/exclusive") ? collectionSublinks : DROPDOWN_LINKS).map((l) => {
                   const active = isActive(l.href);
                   return (
                     <li key={l.href}>

@@ -2,7 +2,34 @@
 
 import { motion } from "framer-motion";
 
-export function HouseStory() {
+// Admin override props for the brand story block. Both optional:
+//   • pullQuote → the big italic quote under the wordmark
+//   • body      → the long-form paragraphs below the quote; blank lines in
+//                 the string are split into separate <p> paragraphs
+export type HouseStoryProps = {
+  pullQuote?: string;
+  body?: string;
+};
+
+const DEFAULT_PULL_QUOTE =
+  "We started with one chandelier and a small studio. The rest of the house grew around it.";
+
+const DEFAULT_BODY = [
+  "The Luxe Version began the way most quiet things do — with a single piece, made carefully, that other rooms wanted. A chandelier, blown by hand, hung over the studio's own dining table. Then a lamp. Then a mirror. Then a form in bronze that did not need explaining.",
+  "We opened the house because there was no place we wanted to buy these pieces from. The luxury stores were noisy. The design shops were dense. Both were full of things that had never been asked to earn their room.",
+  "So the house was built on a different measure — fewer pieces, more time, makers we know. Objects chosen not for what they say about a room, but for what they let the room say back.",
+  "This page is the house's introduction. The pieces themselves live in the collection. When you are ready, they are waiting."
+];
+
+export function HouseStory({ pullQuote, body }: HouseStoryProps = {}) {
+  const resolvedQuote = pullQuote || DEFAULT_PULL_QUOTE;
+  // Split admin body on blank-line separators; fall back to the hardcoded
+  // paragraph list. Empty paragraphs are filtered out so a trailing newline
+  // doesn't produce an empty <p>.
+  const resolvedParagraphs = body
+    ? body.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)
+    : DEFAULT_BODY;
+
   return (
     <section
       className="relative bg-ink py-32 text-chalk md:py-48"
@@ -31,8 +58,7 @@ export function HouseStory() {
           transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
           className="mx-auto mt-16 max-w-5xl text-center font-display text-[clamp(1.5rem,2.4vw,2rem)] font-light italic leading-[1.35] text-chalk/90 md:mt-24"
         >
-          &ldquo;We started with one chandelier and a small studio. The rest of the
-          house grew around it.&rdquo;
+          &ldquo;{resolvedQuote}&rdquo;
         </motion.p>
 
         <motion.div
@@ -42,26 +68,9 @@ export function HouseStory() {
           transition={{ duration: 1.2, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
           className="mx-auto mt-16 max-w-4xl space-y-8 text-center text-[14px] leading-[1.95] text-chalk/80 md:mt-24 md:text-[15px]"
         >
-          <p>
-            The Luxe Version began the way most quiet things do — with a single piece,
-            made carefully, that other rooms wanted. A chandelier, blown by hand, hung
-            over the studio's own dining table. Then a lamp. Then a mirror. Then a form
-            in bronze that did not need explaining.
-          </p>
-          <p>
-            We opened the house because there was no place we wanted to buy these
-            pieces from. The luxury stores were noisy. The design shops were dense. Both
-            were full of things that had never been asked to earn their room.
-          </p>
-          <p>
-            So the house was built on a different measure — fewer pieces, more time,
-            makers we know. Objects chosen not for what they say about a room, but for
-            what they let the room say back.
-          </p>
-          <p>
-            This page is the house's introduction. The pieces themselves live in the
-            collection. When you are ready, they are waiting.
-          </p>
+          {resolvedParagraphs.map((p, i) => (
+            <p key={i}>{p}</p>
+          ))}
         </motion.div>
       </div>
     </section>

@@ -25,7 +25,7 @@ export function ExclusiveIntro() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-15% 0px" }}
           transition={{ duration: 1.2, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
-          className="font-display text-[clamp(1.125rem,1.75vw,1.5rem)] font-light leading-[1.65] text-chalk/85 md:leading-[1.7]"
+          className="font-display text-[clamp(0.9375rem,1.2vw,1.125rem)] font-light leading-[1.65] text-chalk/85 md:leading-[1.7]"
         >
           Pieces on this page do not sit on a shelf. They are made in the studio
           after you ask for them — one at a time, by the same hands, finished to

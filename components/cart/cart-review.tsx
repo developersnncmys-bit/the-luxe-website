@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import clsx from "clsx";
 import { SafeImage } from "@/components/ui/safe-image";
 import { useStore, type WrappingOption } from "@/components/store/store-provider";
+import { productHref } from "@/lib/content";
 import { CheckoutChrome } from "./checkout-chrome";
 
 // Full-page shopping bag — the Chanel-style review that appears when a visitor
@@ -83,7 +84,7 @@ export function CartReview() {
                   className="grid grid-cols-[88px_1fr_auto] items-start gap-6 border-b border-ink/10 py-8 md:grid-cols-[112px_1fr_auto_auto] md:gap-10"
                 >
                   <Link
-                    href={`/collections/${product.category.toLowerCase()}/${product.handle}`}
+                    href={productHref(product)}
                     className="relative h-28 w-20 overflow-hidden bg-ink/5 md:h-36 md:w-28"
                   >
                     <SafeImage
@@ -98,7 +99,7 @@ export function CartReview() {
 
                   <div className="min-w-0">
                     <Link
-                      href={`/collections/${product.category.toLowerCase()}/${product.handle}`}
+                      href={productHref(product)}
                       className="text-[13px] font-semibold uppercase tracking-[0.14em] transition-opacity hover:opacity-70"
                     >
                       {product.name}

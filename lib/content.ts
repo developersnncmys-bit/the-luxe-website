@@ -56,9 +56,22 @@ export function categorySlug(category: string): string {
   return category.toLowerCase().replace(/\s+/g, "-");
 }
 
+// Slugify a product name for use in URLs. Strips diacritics, lowercases,
+// and collapses any non-alphanumeric run to a single dash. Used so product
+// URLs read as `/collections/sculptures/sculpture-cadence` instead of the
+// opaque backend handle (`lv-721518`).
+export function nameSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 // Canonical product URL. All product-card call sites should use this.
 export function productHref(product: Product): string {
-  return `/collections/${categorySlug(product.category)}/${product.handle}`;
+  return `/collections/${categorySlug(product.category)}/${nameSlug(product.name)}`;
 }
 
 // Reference number displayed on the detail page — derived from handle so we
@@ -1652,12 +1665,19 @@ export type ExclusivePiece = {
   number: string;
   name: string;
   discipline: string;
+  // Short italic line shown beneath the name in the featured hero
+  // (e.g. "The Art of Ascent."). Falls back to `intro` when absent.
+  tagline?: string;
   intro: string;
   body: string;
   material: string;
   dimensions: string;
   leadTime: string;
   edition: string;
+  // INR retail price used by the featured hero and the "Add to Bag"
+  // flow. Hardcoded for now — exclusive pieces aren't managed through
+  // the admin product catalog.
+  price?: number;
   image: string;
 };
 
@@ -1666,56 +1686,64 @@ export const EXCLUSIVE_PIECES: ExclusivePiece[] = [
     slug: "monolithe",
     number: "I",
     name: "Monolithe",
-    discipline: "Floor sculpture",
+    tagline: "A Study in Weight.",
     intro: "A single carved form, standing.",
     body:
       "Hand-shaped at the studio and finished in a slow, matte patina. Monolithe is sized to anchor a room — a quiet, upright presence meant to be lived with rather than looked at.",
+    discipline: "Floor sculpture",
     material: "Burnished bronze, hand-patinated",
-    dimensions: "H 1420 · W 320 · D 280 mm",
+    dimensions: "H 1420 · W 320 · D 280 mm · lead time 14 – 18 weeks",
     leadTime: "14 – 18 weeks",
     edition: "Made to order · signed",
+    price: 820000,
     image: "/images/sculptures/scu3.png"
   },
   {
     slug: "halo",
     number: "II",
     name: "Halo",
-    discipline: "Suspended lighting",
+    tagline: "A Circle of Light.",
     intro: "A ring of brass, suspended in air.",
     body:
       "A single machined ring, polished and then softly brushed by hand. Halo throws a warm, downward wash — a quiet circle of light above a table, a bed, a stair.",
+    discipline: "Suspended lighting",
     material: "Solid brass, hand-brushed",
-    dimensions: "Ø 1100 · D 60 mm",
+    dimensions: "Ø 1100 · D 60 mm · lead time 10 – 12 weeks",
     leadTime: "10 – 12 weeks",
     edition: "Made to order · numbered",
+    price: 540000,
     image: "/images/lighting/light2.png"
   },
   {
     slug: "veille",
     number: "III",
     name: "Veille",
-    discipline: "Tabletop vessel",
+    tagline: "The Shape of an Evening.",
     intro: "A vessel the shape of a long evening.",
     body:
       "Thrown in a single pour and finished in a soft, chalk-white glaze. Veille is intended for the table — flowers, dried branches, or nothing at all.",
+    discipline: "Tabletop vessel",
     material: "Stoneware, chalk glaze",
-    dimensions: "H 480 · Ø 220 mm",
+    dimensions: "H 480 · Ø 220 mm · lead time 8 – 10 weeks",
     leadTime: "8 – 10 weeks",
     edition: "Made to order · signed",
+    price: 180000,
     image: "/images/vases/vase2.png"
   },
   {
     slug: "silence",
     number: "IV",
     name: "Silence",
-    discipline: "Wall relief",
+    tagline: "Carved in a Single Pass.",
     intro: "A low relief, carved in a single pass.",
     body:
       "A hand-carved panel in cast plaster, finished to a soft matte. Silence hangs flush to the wall and shifts entirely with the hour of the day — read it in morning light, then again at dusk.",
+    discipline: "Wall relief",
     material: "Cast plaster, hand-finished",
-    dimensions: "H 900 · W 1200 · D 45 mm",
+    dimensions: "H 900 · W 1200 · D 45 mm · lead time 12 – 16 weeks",
     leadTime: "12 – 16 weeks",
     edition: "Made to order · one of one",
+    price: 460000,
     image: "/images/sculptures/scu6.png"
   }
 ];
